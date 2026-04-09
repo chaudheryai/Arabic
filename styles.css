@@ -922,7 +922,7 @@ body {
 .main-stage {
   min-height: 0;
   background: #f8f7f4;
-  padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px) + 16px);
+  padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px) + 4px);
 }
 
 .panel {
