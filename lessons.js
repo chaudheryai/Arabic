@@ -244,5 +244,339 @@ window.APP_LESSONS = [
       { arabic: "إِنْكِلْتَرَا", english: "England" },
       { arabic: "الْمُسْتَشْفَى", english: "hospital" }
     ]
+  },
+  {
+    id: "lesson-9",
+    sequence: 9,
+    label: "Lesson 9",
+    focus: "Adjectives after nouns and adjective agreement",
+    sourcePage: "English key, p. 21",
+    phrases: [
+      { arabic: "بَيْتٌ جَدِيدٌ", english: "A new house." },
+      { arabic: "بِلَالٌ مُدَرِّسٌ جَدِيدٌ", english: "Bilal is a new teacher." },
+      { arabic: "البَيْتُ الجَدِيدُ جَمِيلٌ", english: "The new house is beautiful." }
+    ],
+    vocabulary: [
+      { arabic: "جَدِيدٌ", english: "new" },
+      { arabic: "صَغِيرٌ", english: "small" },
+      { arabic: "جَمِيلٌ", english: "beautiful" },
+      { arabic: "وَلَدٌ", english: "boy" },
+      { arabic: "بِنْتٌ", english: "girl" },
+      { arabic: "سَيَّارَةٌ", english: "car" },
+      { arabic: "بَيْتٌ", english: "house" },
+      { arabic: "كِتَابٌ", english: "book" },
+      { arabic: "مُدَرِّسٌ", english: "teacher" }
+    ]
+  },
+  {
+    id: "lesson-10",
+    sequence: 10,
+    label: "Lesson 10",
+    focus: "Possessive suffixes and irregular family nouns like father and brother",
+    sourcePage: "English key, p. 25",
+    phrases: [
+      { arabic: "كِتَابُكَ", english: "Your book." },
+      { arabic: "كِتَابُهُ", english: "His book." },
+      { arabic: "أَبُو مُحَمَّدٍ", english: "Muhammad's father." }
+    ],
+    vocabulary: [
+      { arabic: "كِتَابُكَ", english: "your book" },
+      { arabic: "كِتَابُهُ", english: "his book" },
+      { arabic: "كِتَابُهَا", english: "her book" },
+      { arabic: "كِتَابِي", english: "my book" },
+      { arabic: "أَبٌ", english: "father" },
+      { arabic: "أَخٌ", english: "brother" },
+      { arabic: "أَبُوهُ", english: "his father" },
+      { arabic: "أَخُوهُ", english: "his brother" },
+      { arabic: "بَيْتُ مُحَمَّدٍ", english: "Muhammad's house" }
+    ]
+  },
+  {
+    id: "lesson-11",
+    sequence: 11,
+    label: "Lesson 11",
+    focus: "Revision lesson with فيه / فيها and the verb أحب",
+    sourcePage: "English key, p. 28",
+    phrases: [
+      { arabic: "مَنْ فِي البَيْتِ؟", english: "Who is in the house?" },
+      { arabic: "فِيهِ أَبِي وَأُمِّي", english: "In it are my father and my mother." },
+      { arabic: "أُحِبُّ اللُّغَةَ العَرَبِيَّةَ", english: "I love the Arabic language." }
+    ],
+    vocabulary: [
+      { arabic: "فِيهِ", english: "in it (masculine)" },
+      { arabic: "فِيهَا", english: "in it (feminine)" },
+      { arabic: "أُحِبُّ", english: "I love" },
+      { arabic: "اللُّغَةُ العَرَبِيَّةُ", english: "Arabic language" },
+      { arabic: "أُحِبُّ اللهَ", english: "I love Allah" },
+      { arabic: "أُحِبُّ الرَّسُولَ", english: "I love the Messenger" }
+    ]
+  },
+  {
+    id: "lesson-12",
+    sequence: 12,
+    label: "Lesson 12",
+    focus: "Feminine singular address, feminine past tense, and the relative pronoun التي",
+    sourcePage: "English key, p. 30",
+    phrases: [
+      { arabic: "مِنْ أَيْنَ أَنْتِ يَا آمِنَةُ؟", english: "Where are you from, Aminah?" },
+      { arabic: "ذَهَبَتْ إِلَى الجَامِعَةِ", english: "She went to the university." },
+      { arabic: "الطَّالِبَةُ الَّتِي جَلَسَتْ أَمَامَ المُدَرِّسَةِ مِنْ أَلْمَانِيَا", english: "The female student who sat in front of the female teacher is from Germany." }
+    ],
+    vocabulary: [
+      { arabic: "أَنْتِ", english: "you (feminine)" },
+      { arabic: "بَيْتُكِ", english: "your house" },
+      { arabic: "ذَهَبَتْ", english: "she went" },
+      { arabic: "الَّتِي", english: "who / which (feminine)" },
+      { arabic: "الجَامِعَةُ", english: "university" },
+      { arabic: "المَدْرَسَةُ", english: "school" },
+      { arabic: "أَمَامَ", english: "in front of" },
+      { arabic: "مَرْيَمُ", english: "Maryam" }
+    ]
+  },
+  {
+    id: "lesson-13",
+    sequence: 13,
+    label: "Lesson 13",
+    focus: "Sound plurals and broken plurals of nouns and adjectives",
+    sourcePage: "English key, p. 33",
+    phrases: [
+      { arabic: "مُسْلِمٌ ← مُسْلِمُونَ", english: "Muslim → Muslims" },
+      { arabic: "مُدَرِّسٌ ← مُدَرِّسُونَ", english: "Teacher → teachers" },
+      { arabic: "مُسْلِمَةٌ ← مُسْلِمَاتٌ", english: "Female Muslim → female Muslims" }
+    ],
+    vocabulary: [
+      { arabic: "مُسْلِمٌ", english: "Muslim" },
+      { arabic: "مُسْلِمُونَ", english: "Muslims" },
+      { arabic: "مُدَرِّسٌ", english: "teacher" },
+      { arabic: "مُدَرِّسُونَ", english: "teachers" },
+      { arabic: "مُسْلِمَةٌ", english: "female Muslim" },
+      { arabic: "مُسْلِمَاتٌ", english: "female Muslims" },
+      { arabic: "مُهَنْدِسَةٌ", english: "female engineer" },
+      { arabic: "مُهَنْدِسَاتٌ", english: "female engineers" }
+    ]
+  },
+  {
+    id: "lesson-14",
+    sequence: 14,
+    label: "Lesson 14",
+    focus: "Plural pronouns أنتم and نحن, plus plural past-tense forms",
+    sourcePage: "English key, p. 41",
+    phrases: [
+      { arabic: "مَنْ أَنْتُمْ؟", english: "Who are you all?" },
+      { arabic: "نَحْنُ مُسْلِمُونَ", english: "We are Muslims." },
+      { arabic: "أَيْنَ ذَهَبْتُمْ يَا أَبْنَائِي؟", english: "Where did you all go, my sons?" }
+    ],
+    vocabulary: [
+      { arabic: "أَنْتُمْ", english: "you all" },
+      { arabic: "كُمْ", english: "your / you all" },
+      { arabic: "نَحْنُ", english: "we" },
+      { arabic: "بَيْتُنَا", english: "our house" },
+      { arabic: "رَبُّنَا", english: "our Lord" },
+      { arabic: "دِينُنَا", english: "our religion" },
+      { arabic: "نَبِيُّنَا", english: "our Prophet" },
+      { arabic: "ذَهَبْتُمْ", english: "you all went" },
+      { arabic: "ذَهَبْنَا", english: "we went" },
+      { arabic: "ذَهَبْنَ", english: "they (feminine) went" }
+    ]
+  },
+  {
+    id: "lesson-15",
+    sequence: 15,
+    label: "Lesson 15",
+    focus: "Feminine plural pronouns, before and after, and the verb رجع",
+    sourcePage: "English key, p. 44",
+    phrases: [
+      { arabic: "مَنْ أَنْتُنَّ يَا أَخَوَاتِي؟", english: "Who are you all, my sisters?" },
+      { arabic: "بَيْتُنَا قَرِيبٌ مِنَ المَسْجِدِ", english: "Our house is near the mosque." },
+      { arabic: "ذَهَبْتُ إِلَى المَسْجِدِ قَبْلَ الأَذَانِ وَرَجَعْتُ بَعْدَ الصَّلَاةِ", english: "I went to the mosque before the adhan and returned after the prayer." }
+    ],
+    vocabulary: [
+      { arabic: "أَنْتُنَّ", english: "you all (feminine)" },
+      { arabic: "كُنَّ", english: "your / you all (feminine)" },
+      { arabic: "بَيْتُكُنَّ", english: "your house (feminine plural)" },
+      { arabic: "ذَهَبْتُنَّ", english: "you all (feminine) went" },
+      { arabic: "قَبْلَ", english: "before" },
+      { arabic: "بَعْدَ", english: "after" },
+      { arabic: "رَجَعَ", english: "he returned" },
+      { arabic: "الصَّلَاةُ", english: "prayer" }
+    ]
+  },
+  {
+    id: "lesson-16",
+    sequence: 16,
+    label: "Lesson 16",
+    focus: "Rational and irrational plurals plus more broken-plural patterns",
+    sourcePage: "English key, p. 46",
+    phrases: [
+      { arabic: "هَذَا طَالِبٌ جَدِيدٌ . هُوَ صَغِيرٌ", english: "This is a new student. He is small." },
+      { arabic: "هَؤُلَاءِ طُلَّابٌ جُدُدٌ . هُمْ صِغَارٌ", english: "These are new students. They are small." },
+      { arabic: "هَذِهِ كُتُبٌ جَدِيدَةٌ . هِيَ صَغِيرَةٌ", english: "These are new books. They are small." }
+    ],
+    vocabulary: [
+      { arabic: "عَاقِلٌ", english: "rational" },
+      { arabic: "غَيْرُ عَاقِلٍ", english: "irrational / non-rational" },
+      { arabic: "طُلَّابٌ", english: "students" },
+      { arabic: "كُتُبٌ", english: "books" },
+      { arabic: "كِلَابٌ", english: "dogs" },
+      { arabic: "مَسَاجِدُ", english: "mosques" },
+      { arabic: "دَفَاتِرُ", english: "notebooks" }
+    ]
+  },
+  {
+    id: "lesson-17",
+    sequence: 17,
+    label: "Lesson 17",
+    focus: "Continuation of plural exercises and review vocabulary",
+    sourcePage: "English key, p. 48",
+    phrases: [
+      { arabic: "هَذَا مُدِيرُ الشَّرِكَةِ", english: "This is the manager of the company." },
+      { arabic: "هَذَا القَمِيصُ رَخِيصٌ", english: "This shirt is cheap." },
+      { arabic: "هَذِهِ سَيَّارَةٌ يَابَانِيَّةٌ", english: "This is a Japanese car." }
+    ],
+    vocabulary: [
+      { arabic: "الشَّرِكَةُ", english: "company" },
+      { arabic: "مُدِيرُ الشَّرِكَةِ", english: "company manager" },
+      { arabic: "رَخِيصٌ", english: "cheap" },
+      { arabic: "يَابَانِيَّةٌ", english: "Japanese (feminine)" },
+      { arabic: "القَمِيصُ", english: "shirt" },
+      { arabic: "قَمِيصَانِ", english: "two shirts" }
+    ]
+  },
+  {
+    id: "lesson-18",
+    sequence: 18,
+    label: "Lesson 18",
+    focus: "Dual forms and the question word كم",
+    sourcePage: "English key, p. 49",
+    phrases: [
+      { arabic: "مَنْ هَذَانِ الوَلَدَانِ؟", english: "Who are these two boys?" },
+      { arabic: "هُمَا طَالِبَانِ جَدِيدَانِ", english: "They are two new students." },
+      { arabic: "كَمْ كِتَابًا؟", english: "How many books?" }
+    ],
+    vocabulary: [
+      { arabic: "بَيْتَانِ", english: "two houses" },
+      { arabic: "يَدَانِ", english: "two hands" },
+      { arabic: "هَذَانِ", english: "these two (masculine)" },
+      { arabic: "هَاتَانِ", english: "these two (feminine)" },
+      { arabic: "هُمَا", english: "they two" },
+      { arabic: "كَمْ", english: "how many" }
+    ]
+  },
+  {
+    id: "lesson-19",
+    sequence: 19,
+    label: "Lesson 19",
+    focus: "Numbers 3 to 10 with masculine counted nouns",
+    sourcePage: "English key, p. 51",
+    phrases: [
+      { arabic: "ثَلَاثَةُ كُتُبٍ", english: "Three books." },
+      { arabic: "خَمْسَةُ أَقْلَامٍ", english: "Five pens." },
+      { arabic: "رَأَيْتُ خَمْسَةَ رِجَالٍ", english: "I saw five men." }
+    ],
+    vocabulary: [
+      { arabic: "وَاحِدٌ", english: "one" },
+      { arabic: "اثْنَانِ", english: "two" },
+      { arabic: "ثَلَاثَةُ", english: "three" },
+      { arabic: "أَرْبَعَةُ", english: "four" },
+      { arabic: "خَمْسَةُ", english: "five" },
+      { arabic: "عَشَرَةُ", english: "ten" },
+      { arabic: "كُتُبٌ", english: "books" },
+      { arabic: "بُيُوتٌ", english: "houses" },
+      { arabic: "أَقْلَامٌ", english: "pens" },
+      { arabic: "رِجَالٌ", english: "men" }
+    ]
+  },
+  {
+    id: "lesson-20",
+    sequence: 20,
+    label: "Lesson 20",
+    focus: "Numbers 3 to 10 with feminine counted nouns",
+    sourcePage: "English key, p. 53",
+    phrases: [
+      { arabic: "ثَلَاثُ بَنَاتٍ", english: "Three girls." },
+      { arabic: "سَبْعُ طَالِبَاتٍ", english: "Seven female students." },
+      { arabic: "عَشْرُ نِسَاءٍ", english: "Ten women." }
+    ],
+    vocabulary: [
+      { arabic: "ثَلَاثُ بَنَاتٍ", english: "three girls" },
+      { arabic: "أَرْبَعُ أَخَوَاتٍ", english: "four sisters" },
+      { arabic: "خَمْسُ أُمَّهَاتٍ", english: "five mothers" },
+      { arabic: "سِتُّ نِسَاءٍ", english: "six women" },
+      { arabic: "سَبْعُ طَالِبَاتٍ", english: "seven female students" },
+      { arabic: "ثَمَانِي غُرَفٍ", english: "eight rooms" },
+      { arabic: "عَشْرُ نِسَاءٍ", english: "ten women" },
+      { arabic: "وَاحِدَةٌ", english: "one (feminine)" },
+      { arabic: "اثْنَتَانِ", english: "two (feminine)" }
+    ]
+  },
+  {
+    id: "lesson-21",
+    sequence: 21,
+    label: "Lesson 21",
+    focus: "Test lesson with review and a few new words",
+    sourcePage: "English key, p. 55",
+    phrases: [
+      { arabic: "ذَاكَ اللَّوْنُ جَمِيلٌ", english: "That color is beautiful." },
+      { arabic: "هَذَا البَيْتُ وَاسِعٌ", english: "This house is spacious." },
+      { arabic: "نَحْنُ نُحِبُّهُ", english: "We love it." }
+    ],
+    vocabulary: [
+      { arabic: "ذَاكَ", english: "that" },
+      { arabic: "اللَّوْنُ", english: "color" },
+      { arabic: "أَلْوَانٌ", english: "colors" },
+      { arabic: "وَاسِعٌ", english: "spacious" },
+      { arabic: "آسِيَا", english: "Asia" },
+      { arabic: "نُحِبُّ", english: "we love" },
+      { arabic: "نُحِبُّهُ", english: "we love it" }
+    ]
+  },
+  {
+    id: "lesson-22",
+    sequence: 22,
+    label: "Lesson 22",
+    focus: "Diptotes and groups of nouns and adjectives without tanwin",
+    sourcePage: "English key, p. 56",
+    phrases: [
+      { arabic: "كِتَابٌ : الكِتَابُ", english: "A book : the book." },
+      { arabic: "كِتَابُ بِلَالٍ", english: "Bilal's book." },
+      { arabic: "يَا أُسْتَاذُ", english: "O teacher." }
+    ],
+    vocabulary: [
+      { arabic: "آمِنَةُ", english: "Aminah" },
+      { arabic: "زَيْنَبُ", english: "Zaynab" },
+      { arabic: "حَمْزَةُ", english: "Hamzah" },
+      { arabic: "أُسَامَةُ", english: "Usamah" },
+      { arabic: "عُثْمَانُ", english: "Uthman" },
+      { arabic: "رَمَضَانُ", english: "Ramadan" },
+      { arabic: "أَحْمَرُ", english: "red" },
+      { arabic: "أَسْوَدُ", english: "black" },
+      { arabic: "لَنْدَنُ", english: "London" },
+      { arabic: "بَاكِسْتَانُ", english: "Pakistan" },
+      { arabic: "مَسَاجِدُ", english: "mosques" },
+      { arabic: "فَنَادِقُ", english: "hotels" },
+      { arabic: "مَفَاتِيحُ", english: "keys" }
+    ]
+  },
+  {
+    id: "lesson-23",
+    sequence: 23,
+    label: "Lesson 23",
+    focus: "Genitive endings of diptotes after prepositions and in idafah",
+    sourcePage: "English key, p. 58",
+    phrases: [
+      { arabic: "مِنْ بِلالَ", english: "From Bilal." },
+      { arabic: "كِتَابُ أَحْمَدَ", english: "Ahmad's book." },
+      { arabic: "ثَلَاثَةُ مَسَاجِدَ", english: "Three mosques." }
+    ],
+    vocabulary: [
+      { arabic: "إِبْرَاهِيمُ", english: "Ibrahim" },
+      { arabic: "أَحْمَدُ", english: "Ahmad" },
+      { arabic: "إِسْطَنْبُولُ", english: "Istanbul" },
+      { arabic: "وَاشِنْطُنُ", english: "Washington" },
+      { arabic: "الطَّائِفُ", english: "Taif" },
+      { arabic: "مَسَاجِدُ", english: "mosques" },
+      { arabic: "فَنَادِقُ", english: "hotels" },
+      { arabic: "زُمَلَاءُ", english: "colleagues" }
+    ]
   }
 ];

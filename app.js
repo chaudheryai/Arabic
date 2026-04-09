@@ -1,20 +1,97 @@
 (function () {
-  const lessons = (window.APP_LESSONS || []).slice().sort((a, b) => a.sequence - b.sequence);
-  const storageKey = "madinah-lab-session-v1";
+  const rawLessons = (window.APP_LESSONS || []).slice().sort((a, b) => a.sequence - b.sequence);
+  const storageKey = "madinah-lab-session-v2";
   const root = document.getElementById("app");
   let recognition = null;
 
+  const CATEGORY_OPTIONS = [
+    { key: "all", label: "الكل" },
+    { key: "madina_book1", label: "كتاب المدينة" },
+    { key: "alphabet", label: "الحروف" },
+    { key: "greetings", label: "تحيات" },
+    { key: "numbers", label: "أرقام" },
+    { key: "food", label: "طعام" },
+    { key: "travel", label: "سفر" },
+    { key: "family", label: "عائلة" },
+    { key: "daily_life", label: "حياة يومية" },
+    { key: "grammar", label: "قواعد" }
+  ];
+
+  const LEVEL_OPTIONS = [
+    { key: "all", label: "جميع المستويات" },
+    { key: "beginner", label: "مبتدئ" },
+    { key: "intermediate", label: "متوسط" },
+    { key: "advanced", label: "متقدم" }
+  ];
+
+  const PRACTICE_MODES = [
+    { key: "quiz", label: "Quiz", labelAr: "اختبار", note: "4-choice cumulative lesson quizzes", icon: "❓" },
+    { key: "flashcards", label: "Flashcards", labelAr: "بطاقات", note: "Test both directions with retries", icon: "🗂" },
+    { key: "matching", label: "Matching", labelAr: "مطابقة", note: "Pair Arabic with English", icon: "🎯" },
+    { key: "typing", label: "Typing", labelAr: "كتابة", note: "Practice spelling and haraqat", icon: "⌨" },
+    { key: "pronunciation", label: "Pronunciation", labelAr: "نطق", note: "Listen, speak, and compare", icon: "🎙" }
+  ];
+
+  const ARABIC_ALPHABET = [
+    { letter: "ا", name: "Alif", transliteration: "a", sound: "Like the long a in father." },
+    { letter: "ب", name: "Ba", transliteration: "b", sound: "Like b in boy." },
+    { letter: "ت", name: "Ta", transliteration: "t", sound: "Like t in top." },
+    { letter: "ث", name: "Tha", transliteration: "th", sound: "Like th in think." },
+    { letter: "ج", name: "Jim", transliteration: "j", sound: "Like j in jam." },
+    { letter: "ح", name: "Ha", transliteration: "h", sound: "A deep breathy h from the throat." },
+    { letter: "خ", name: "Kha", transliteration: "kh", sound: "Like the ch in Bach." },
+    { letter: "د", name: "Dal", transliteration: "d", sound: "Like d in dog." },
+    { letter: "ذ", name: "Dhal", transliteration: "dh", sound: "Like th in this." },
+    { letter: "ر", name: "Ra", transliteration: "r", sound: "A lightly rolled r." },
+    { letter: "ز", name: "Zay", transliteration: "z", sound: "Like z in zoo." },
+    { letter: "س", name: "Sin", transliteration: "s", sound: "Like s in sun." },
+    { letter: "ش", name: "Shin", transliteration: "sh", sound: "Like sh in ship." },
+    { letter: "ص", name: "Sad", transliteration: "s", sound: "An emphatic heavy s." },
+    { letter: "ض", name: "Dad", transliteration: "d", sound: "An emphatic heavy d." },
+    { letter: "ط", name: "Ta", transliteration: "t", sound: "An emphatic heavy t." },
+    { letter: "ظ", name: "Dha", transliteration: "dh", sound: "An emphatic heavy dh." },
+    { letter: "ع", name: "Ayn", transliteration: "'", sound: "A throat sound unique to Arabic." },
+    { letter: "غ", name: "Ghayn", transliteration: "gh", sound: "A gargled gh from the throat." },
+    { letter: "ف", name: "Fa", transliteration: "f", sound: "Like f in fun." },
+    { letter: "ق", name: "Qaf", transliteration: "q", sound: "A deep back-of-throat k." },
+    { letter: "ك", name: "Kaf", transliteration: "k", sound: "Like k in kite." },
+    { letter: "ل", name: "Lam", transliteration: "l", sound: "Like l in light." },
+    { letter: "م", name: "Mim", transliteration: "m", sound: "Like m in moon." },
+    { letter: "ن", name: "Nun", transliteration: "n", sound: "Like n in noon." },
+    { letter: "ه", name: "Ha", transliteration: "h", sound: "Like h in hat." },
+    { letter: "و", name: "Waw", transliteration: "w", sound: "Like w in water." },
+    { letter: "ي", name: "Ya", transliteration: "y", sound: "Like y in yes." }
+  ];
+
+  const lessons = rawLessons.map(normalizeLesson);
+
   const state = {
-    section: "dashboard",
-    mode: "flashcards",
+    section: "home",
     lessonId: lessons[0]?.id || "",
+    practiceLessonId: lessons[0]?.id || "",
     lessonDetailOpen: false,
-    lessonSlideIndex: 0,
-    flashDirection: "mixed",
+    lessonContentIndex: 0,
+    lessonAnswers: {},
+    lessonCompleted: false,
+    lessonFilterCategory: "all",
+    lessonFilterLevel: "all",
+    lessonSearch: "",
+    alphabetSelected: null,
+    practiceMode: null,
+    quizDirection: "en-to-ar",
+    quizRound: [],
+    quizIndex: 0,
+    quizAnswers: {},
+    quizComplete: false,
+    flashDirection: "ar-to-en",
     flashShuffle: true,
     flashDeck: [],
     flashIndex: 0,
+    flashRoundTotal: 0,
     flashRevealed: false,
+    flashKnown: [],
+    flashUnknown: [],
+    flashRoundComplete: false,
     matchRound: [],
     matchSelection: [],
     matchSolved: [],
@@ -31,6 +108,85 @@
     progress: loadSession()
   };
 
+  function normalizeLesson(raw, index) {
+    const vocabulary = (raw.vocabulary || []).map((entry, entryIndex) => ({
+      type: "vocab",
+      arabic: entry.arabic,
+      transliteration: entry.transliteration || "",
+      english: entry.english,
+      audio_hint: buildAudioHint(entry.arabic),
+      id: `${raw.id}-vocab-${entryIndex}`
+    }));
+
+    const phrases = (raw.phrases || []).map((entry, entryIndex) => ({
+      type: "phrase",
+      arabic: entry.arabic,
+      transliteration: entry.transliteration || "",
+      english: entry.english,
+      audio_hint: "Read it aloud, then listen and repeat.",
+      id: `${raw.id}-phrase-${entryIndex}`
+    }));
+
+    return {
+      id: raw.id,
+      label: raw.label,
+      title: `${raw.label} — ${raw.focus}`,
+      title_ar: phrases[0]?.arabic || vocabulary[0]?.arabic || raw.label,
+      category: "madina_book1",
+      level: "beginner",
+      order: index + 1,
+      lesson_number: Number.isFinite(raw.sequence) ? Math.floor(raw.sequence) : index + 1,
+      description: `${raw.focus}. Focus on the vocabulary first, then repeat the core pattern out loud.`,
+      content: buildLessonContent(raw, vocabulary, phrases),
+      xp_reward: Math.max(50, Math.min(120, vocabulary.length * 4)),
+      estimated_minutes: Math.max(8, Math.min(18, Math.ceil((vocabulary.length + phrases.length * 2) / 3))),
+      icon: pickLessonIcon(index),
+      sourcePage: raw.sourcePage || "",
+      focus: raw.focus,
+      phrases,
+      vocabulary
+    };
+  }
+
+  function pickLessonIcon(index) {
+    return ["📘", "🐪", "👉", "🧭", "📍", "🏠", "🫖", "👩", "🌍"][index % 9];
+  }
+
+  function buildAudioHint(arabic) {
+    if (/[ًٌٍ]/.test(arabic)) return "Notice the tanwin ending when you say it aloud.";
+    if (/[َُِّّّ]/.test(arabic)) return "Listen for the shaddah and keep the doubled sound clear.";
+    return "Say it slowly first, then repeat it at a natural pace.";
+  }
+
+  function buildLessonContent(raw, vocabulary, phrases) {
+    const grammarNote = {
+      type: "grammar_note",
+      arabic: phrases[0]?.arabic || vocabulary[0]?.arabic || "",
+      transliteration: raw.focus,
+      english: `${raw.focus}. Study the pattern, say the examples aloud, and then drill the vocabulary until it feels natural both ways.`,
+      audio_hint: raw.sourcePage || "",
+      id: `${raw.id}-grammar`
+    };
+
+    const quizTargets = vocabulary.slice(0, Math.min(4, vocabulary.length)).map((entry, quizIndex) => {
+      const distractors = shuffle(vocabulary.filter((item) => item.id !== entry.id))
+        .slice(0, 3)
+        .map((item) => item.arabic);
+      return {
+        type: "quiz",
+        arabic: "",
+        transliteration: "",
+        english: `Choose the Arabic for "${entry.english}".`,
+        audio_hint: "Pick the correct Arabic answer.",
+        options: shuffle([entry.arabic].concat(distractors)),
+        correct_answer: entry.arabic,
+        id: `${raw.id}-quiz-${quizIndex}`
+      };
+    });
+
+    return [grammarNote].concat(phrases).concat(vocabulary).concat(quizTargets);
+  }
+
   function today() {
     return new Date().toISOString().slice(0, 10);
   }
@@ -38,15 +194,16 @@
   function loadSession() {
     try {
       const raw = sessionStorage.getItem(storageKey);
-      if (!raw) return { cards: {}, activityDates: [], sessionAnswers: 0 };
+      if (!raw) return { cards: {}, activityDates: [], sessionAnswers: 0, lessons: {} };
       const parsed = JSON.parse(raw);
       return {
         cards: parsed.cards || {},
         activityDates: parsed.activityDates || [],
-        sessionAnswers: parsed.sessionAnswers || 0
+        sessionAnswers: parsed.sessionAnswers || 0,
+        lessons: parsed.lessons || {}
       };
     } catch {
-      return { cards: {}, activityDates: [], sessionAnswers: 0 };
+      return { cards: {}, activityDates: [], sessionAnswers: 0, lessons: {} };
     }
   }
 
@@ -54,12 +211,59 @@
     sessionStorage.setItem(storageKey, JSON.stringify(state.progress));
   }
 
+  function getLessonById(lessonId) {
+    return lessons.find((lesson) => lesson.id === lessonId) || lessons[0];
+  }
+
   function getLesson() {
-    return lessons.find((lesson) => lesson.id === state.lessonId) || lessons[0];
+    return getLessonById(state.lessonId);
+  }
+
+  function getPracticeLesson() {
+    return getLessonById(state.practiceLessonId);
   }
 
   function cardId(lessonId, entry) {
     return `${lessonId}::${entry.arabic}`;
+  }
+
+  function markActivity() {
+    if (!state.progress.activityDates.includes(today())) state.progress.activityDates.push(today());
+  }
+
+  function computeStreak(dates) {
+    if (!dates.length) return 0;
+    const set = new Set(dates);
+    let cursor = new Date();
+    let streak = 0;
+    while (set.has(cursor.toISOString().slice(0, 10))) {
+      streak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return streak;
+  }
+
+  function computeTotalXp() {
+    return Object.values(state.progress.lessons).reduce((sum, item) => sum + (item.xp_earned || 0), 0);
+  }
+
+  function ensureLessonProgressStarted(lessonId) {
+    const current = state.progress.lessons[lessonId] || {
+      lesson_id: lessonId,
+      status: "not_started",
+      score: 0,
+      xp_earned: 0,
+      attempts: 0,
+      total_xp: 0,
+      current_streak: 0,
+      last_practice_date: ""
+    };
+
+    if (current.status === "not_started") current.status = "in_progress";
+    current.last_practice_date = today();
+    current.current_streak = computeStreak(state.progress.activityDates);
+    current.total_xp = computeTotalXp();
+    state.progress.lessons[lessonId] = current;
   }
 
   function trackAnswer(lessonId, entry, result) {
@@ -70,9 +274,8 @@
     if (result === "unknown") current.unknown += 1;
     state.progress.cards[id] = current;
     state.progress.sessionAnswers += 1;
-    if (!state.progress.activityDates.includes(today())) {
-      state.progress.activityDates.push(today());
-    }
+    markActivity();
+    ensureLessonProgressStarted(lessonId);
     saveSession();
   }
 
@@ -113,7 +316,7 @@
   function normalizeEnglish(value) {
     return String(value)
       .toLowerCase()
-      .replace(/[^a-z0-9'\- ]/g, "")
+      .replace(/[^a-z0-9' -]/g, "")
       .replace(/\s+/g, " ")
       .trim();
   }
@@ -127,16 +330,27 @@
     return normalizeEnglish(expected) === normalizeEnglish(input);
   }
 
-  function computeStreak(dates) {
-    if (!dates.length) return 0;
-    const set = new Set(dates);
-    let cursor = new Date();
-    let streak = 0;
-    while (set.has(cursor.toISOString().slice(0, 10))) {
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return streak;
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function filteredLessons() {
+    return lessons.filter((lesson) => {
+      if (state.lessonFilterCategory !== "all" && lesson.category !== state.lessonFilterCategory) return false;
+      if (state.lessonFilterLevel !== "all" && lesson.level !== state.lessonFilterLevel) return false;
+      if (!state.lessonSearch.trim()) return true;
+      const query = state.lessonSearch.trim().toLowerCase();
+      return (
+        lesson.title.toLowerCase().includes(query) ||
+        lesson.title_ar.includes(state.lessonSearch.trim()) ||
+        lesson.description.toLowerCase().includes(query) ||
+        lesson.focus.toLowerCase().includes(query)
+      );
+    });
   }
 
   function computeLessonStats(lesson) {
@@ -146,16 +360,22 @@
         accumulator.known += stats.known;
         accumulator.unknown += stats.unknown;
         accumulator.seen += stats.seen;
-        if (stats.known >= 2 && stats.known > stats.unknown) {
-          accumulator.mastered += 1;
-        }
+        if (stats.known >= 2 && stats.known > stats.unknown) accumulator.mastered += 1;
         return accumulator;
       },
       { known: 0, unknown: 0, seen: 0, mastered: 0 }
     );
 
+    const stored = state.progress.lessons[lesson.id];
     const totalAttempts = totals.known + totals.unknown;
-    return { ...totals, percent: totalAttempts ? Math.round((totals.known / totalAttempts) * 100) : 0 };
+    return {
+      ...totals,
+      status: stored?.status || (totals.seen ? "in_progress" : "not_started"),
+      percent: totalAttempts ? Math.round((totals.known / totalAttempts) * 100) : 0,
+      score: stored?.score || 0,
+      xp: stored?.xp_earned || 0,
+      attempts: stored?.attempts || 0
+    };
   }
 
   function computeOverallStats() {
@@ -168,113 +388,83 @@
       const stats = state.progress.cards[cardId(lesson.id, entry)] || { known: 0, unknown: 0 };
       return stats.known >= 2 && stats.known > stats.unknown;
     }).length;
+    const lessonProgressItems = Object.values(state.progress.lessons);
+    const completedCount = lessonProgressItems.filter((item) => item.status === "completed").length;
+    const scored = lessonProgressItems.filter((item) => item.score);
     return {
       reviewedCards,
       masteredCards,
+      completedCount,
+      sessionAnswers: state.progress.sessionAnswers,
       streak: computeStreak(state.progress.activityDates),
-      sessionAnswers: state.progress.sessionAnswers
+      totalXp: computeTotalXp(),
+      averageScore: scored.length ? Math.round(scored.reduce((sum, item) => sum + item.score, 0) / scored.length) : 0,
+      overallProgress: lessons.length ? Math.round((completedCount / lessons.length) * 100) : 0
     };
   }
 
-  function currentFlashCard() {
-    if (!state.flashDeck.length) resetFlashcards();
-    return state.flashDeck[state.flashIndex] || state.flashDeck[0];
+  function resetLessonFlow(lessonId) {
+    state.lessonId = lessonId;
+    state.lessonDetailOpen = true;
+    state.lessonContentIndex = 0;
+    state.lessonAnswers = {};
+    state.lessonCompleted = false;
+    markActivity();
+    ensureLessonProgressStarted(lessonId);
+    saveSession();
   }
 
-  function flashRoundTotal() {
-    return getLesson().vocabulary.length || 1;
-  }
-
-  function flashSolvedCount() {
-    return Math.max(0, flashRoundTotal() - state.flashDeck.length);
-  }
-
-  function flashCardPosition() {
-    return Math.min(flashRoundTotal(), flashSolvedCount() + (state.flashDeck.length ? 1 : 0));
-  }
-
-  function resetFlashcards() {
+  function completeLesson() {
     const lesson = getLesson();
-    const deck = lesson.vocabulary.map((entry, index) => ({
-      entry,
-      direction:
-        state.flashDirection === "mixed"
-          ? (Math.random() > 0.5 ? "en-to-ar" : "ar-to-en")
-          : state.flashDirection,
-      id: `${lesson.id}-${index}`
-    }));
-    state.flashDeck = state.flashShuffle ? shuffle(deck) : deck;
-    state.flashIndex = 0;
-    state.flashRevealed = false;
+    const quizItems = lesson.content.filter((item) => item.type === "quiz");
+    const correctCount = quizItems.reduce((count, item) => {
+      const quizIndex = lesson.content.findIndex((candidate) => candidate.id === item.id);
+      return count + (state.lessonAnswers[quizIndex] === item.correct_answer ? 1 : 0);
+    }, 0);
+    const score = quizItems.length ? Math.round((correctCount / quizItems.length) * 100) : 100;
+    markActivity();
+
+    const existing = state.progress.lessons[lesson.id] || {
+      lesson_id: lesson.id,
+      status: "in_progress",
+      score: 0,
+      xp_earned: 0,
+      attempts: 0
+    };
+
+    state.progress.lessons[lesson.id] = {
+      ...existing,
+      lesson_id: lesson.id,
+      status: "completed",
+      score,
+      xp_earned: lesson.xp_reward,
+      completed_at: new Date().toISOString(),
+      attempts: (existing.attempts || 0) + 1,
+      last_practice_date: today(),
+      current_streak: computeStreak(state.progress.activityDates),
+      total_xp: computeTotalXp() + (existing.xp_earned ? 0 : lesson.xp_reward)
+    };
+
+    saveSession();
+    state.lessonCompleted = true;
   }
 
-  function advanceFlashcard(result) {
-    const lesson = getLesson();
-    const card = currentFlashCard();
-    if (result) trackAnswer(lesson.id, card.entry, result);
-
-    const queue = state.flashDeck.slice();
-    const currentIndex = Math.min(state.flashIndex, Math.max(queue.length - 1, 0));
-    const [currentCard] = queue.splice(currentIndex, 1);
-
-    if (result === "unknown" && currentCard) {
-      queue.push(currentCard);
-    }
-
-    if (!queue.length) {
-      resetFlashcards();
-      return;
-    }
-
-    state.flashDeck = queue;
-    state.flashIndex = currentIndex >= queue.length ? 0 : currentIndex;
-    state.flashRevealed = false;
+  function speakArabic(text) {
+    if (!("speechSynthesis" in window) || !text) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "ar-SA";
+    utterance.rate = text.length <= 2 ? 0.6 : 0.8;
+    const voices = window.speechSynthesis.getVoices();
+    const arabicVoice =
+      voices.find((voice) => voice.lang && voice.lang.toLowerCase().startsWith("ar")) ||
+      voices.find((voice) => /arab/i.test(`${voice.name} ${voice.lang}`));
+    if (arabicVoice) utterance.voice = arabicVoice;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
   }
 
-  function resetMatchRound() {
-    const lesson = getLesson();
-    const picks = sample(lesson.vocabulary, lesson.vocabulary.length > 5 ? 6 : lesson.vocabulary.length);
-    const leftSide = picks.map((entry, index) => ({ id: `${index}-ar`, pairId: index, side: "arabic", label: entry.arabic }));
-    const rightSide = shuffle(picks).map((entry, index) => ({
-      id: `${index}-en`,
-      pairId: picks.findIndex((candidate) => candidate.arabic === entry.arabic),
-      side: "english",
-      label: entry.english
-    }));
-    state.matchRound = shuffle([...leftSide, ...rightSide]);
-    state.matchSelection = [];
-    state.matchSolved = [];
-    state.matchFeedback = "";
-  }
-
-  function resetTyping() {
-    state.typingIndex = 0;
-    state.typingInput = "";
-    state.typingFeedback = null;
-  }
-
-  function nextTypingCard() {
-    state.typingIndex = (state.typingIndex + 1) % getLesson().vocabulary.length;
-    state.typingInput = "";
-    state.typingFeedback = null;
-  }
-
-  function pronunciationPool() {
-    const lesson = getLesson();
-    const phrasePool = lesson.phrases.map((phrase) => ({ arabic: phrase.arabic, english: phrase.english }));
-    return phrasePool.length ? phrasePool : lesson.vocabulary;
-  }
-
-  function nextPronunciationPrompt() {
-    state.pronunciationIndex = (state.pronunciationIndex + 1) % pronunciationPool().length;
-    state.pronunciationFeedback = null;
-    state.pronunciationTranscript = "";
-  }
-
-  function resetPronunciation() {
-    state.pronunciationIndex = 0;
-    state.pronunciationFeedback = null;
-    state.pronunciationTranscript = "";
+  function supportsSpeechRecognition() {
+    return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
   }
 
   function similarity(a, b) {
@@ -288,8 +478,9 @@
     return Math.max(0, Math.round((matches / maxLength) * 100));
   }
 
-  function supportsSpeechRecognition() {
-    return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  function pronunciationPool() {
+    const lesson = getPracticeLesson();
+    return lesson.phrases.length ? lesson.phrases : lesson.vocabulary;
   }
 
   function getRecognition() {
@@ -311,9 +502,10 @@
       state.pronunciationFeedback = {
         correct,
         score: similarity(normalizeArabicLoose(target.arabic), normalizeArabicLoose(transcript)),
-        target: target.arabic
+        target: target.arabic,
+        message: correct ? "Good match. Keep the rhythm and haraqat clear." : "Close. Repeat the target slowly and try again."
       };
-      if (correct) trackAnswer(getLesson().id, target, "known");
+      if (correct) trackAnswer(getPracticeLesson().id, target, "known");
       render();
     };
     recognition.onstart = () => {
@@ -329,7 +521,7 @@
       state.pronunciationFeedback = {
         correct: false,
         score: 0,
-        target: pronunciationPool()[state.pronunciationIndex].arabic,
+        target: pronunciationPool()[state.pronunciationIndex]?.arabic || "",
         message: event.error === "not-allowed" ? "Microphone permission was blocked." : "Speech recognition could not finish."
       };
       render();
@@ -337,133 +529,507 @@
     return recognition;
   }
 
-  function speakArabic(text) {
-    if (!("speechSynthesis" in window)) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "ar-SA";
-    utterance.rate = 0.8;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+  function currentFlashCard() {
+    if (!state.flashDeck.length && !state.flashRoundComplete) resetFlashcards();
+    return state.flashDeck[state.flashIndex] || state.flashDeck[0] || null;
+  }
+
+  function flashSourceEntries() {
+    return getPracticeLesson().vocabulary;
+  }
+
+  function resetFlashcards(entries) {
+    const sourceEntries = (entries || flashSourceEntries()).slice();
+    const deck = sourceEntries.map((entry, index) => ({
+      entry,
+      direction:
+        state.flashDirection === "mixed"
+          ? (Math.random() > 0.5 ? "en-to-ar" : "ar-to-en")
+          : state.flashDirection,
+      id: entry.id || `${getPracticeLesson().id}-flash-${index}`
+    }));
+
+    state.flashDeck = state.flashShuffle ? shuffle(deck) : deck;
+    state.flashIndex = 0;
+    state.flashRoundTotal = deck.length || 1;
+    state.flashRevealed = false;
+    state.flashKnown = [];
+    state.flashUnknown = [];
+    state.flashRoundComplete = false;
+  }
+
+  function flashSolvedCount() {
+    return Math.max(0, state.flashRoundTotal - state.flashDeck.length);
+  }
+
+  function flashCardPosition() {
+    if (state.flashRoundComplete) return state.flashRoundTotal;
+    return state.flashDeck.length ? Math.min(state.flashRoundTotal, flashSolvedCount() + 1) : 1;
+  }
+
+  function pushUniqueCard(collection, card) {
+    if (!collection.some((item) => item.id === card.id)) collection.push(card);
+  }
+
+  function advanceFlashcard(result) {
+    const lesson = getPracticeLesson();
+    const card = currentFlashCard();
+    if (!card) return;
+
+    trackAnswer(lesson.id, card.entry, result);
+    const queue = state.flashDeck.slice();
+    const currentIndex = Math.min(state.flashIndex, Math.max(queue.length - 1, 0));
+    const removed = queue.splice(currentIndex, 1)[0];
+
+    if (result === "known") pushUniqueCard(state.flashKnown, removed);
+    if (result === "unknown") {
+      pushUniqueCard(state.flashUnknown, removed);
+      queue.push(removed);
+    }
+
+    if (!queue.length) {
+      state.flashDeck = [];
+      state.flashIndex = 0;
+      state.flashRevealed = false;
+      state.flashRoundComplete = true;
+      return;
+    }
+
+    state.flashDeck = queue;
+    state.flashIndex = currentIndex >= queue.length ? 0 : currentIndex;
+    state.flashRevealed = false;
+  }
+
+  function resetMatchRound() {
+    const lesson = getPracticeLesson();
+    const picks = sample(lesson.vocabulary, lesson.vocabulary.length > 5 ? 6 : lesson.vocabulary.length);
+    const leftSide = picks.map((entry, index) => ({
+      id: `${index}-ar`,
+      pairId: index,
+      side: "arabic",
+      label: entry.arabic
+    }));
+    const rightSide = shuffle(picks).map((entry, index) => ({
+      id: `${index}-en`,
+      pairId: picks.findIndex((candidate) => candidate.id === entry.id),
+      side: "english",
+      label: entry.english
+    }));
+    state.matchRound = shuffle(leftSide.concat(rightSide));
+    state.matchSelection = [];
+    state.matchSolved = [];
+    state.matchFeedback = "";
+  }
+
+  function cumulativeQuizPool() {
+    const lesson = getPracticeLesson();
+    return lessons
+      .filter((entry) => entry.order <= lesson.order)
+      .flatMap((entry) => entry.vocabulary);
+  }
+
+  function buildQuizRound() {
+    const pool = cumulativeQuizPool();
+    const questionPool = sample(pool, Math.min(10, pool.length));
+    return questionPool.map((entry, index) => {
+      const distractors = shuffle(pool.filter((item) => item.id !== entry.id)).slice(0, 3);
+      if (state.quizDirection === "en-to-ar") {
+        return {
+          id: `${entry.id}-quiz-${index}`,
+          direction: "en-to-ar",
+          prompt: entry.english,
+          promptHint: "Choose the Arabic word",
+          correct_answer: entry.arabic,
+          options: shuffle([entry.arabic].concat(distractors.map((item) => item.arabic))),
+          entry
+        };
+      }
+
+      return {
+        id: `${entry.id}-quiz-${index}`,
+        direction: "ar-to-en",
+        prompt: entry.arabic,
+        promptHint: "Choose the English meaning",
+        correct_answer: entry.english,
+        options: shuffle([entry.english].concat(distractors.map((item) => item.english))),
+        entry
+      };
+    });
+  }
+
+  function resetQuizRound() {
+    state.quizRound = buildQuizRound();
+    state.quizIndex = 0;
+    state.quizAnswers = {};
+    state.quizComplete = false;
+  }
+
+  function currentQuizItem() {
+    return state.quizRound[state.quizIndex] || state.quizRound[0] || null;
+  }
+
+  function quizScore() {
+    return state.quizRound.reduce((count, item, index) => count + (state.quizAnswers[index] === item.correct_answer ? 1 : 0), 0);
+  }
+
+  function completeQuizRound() {
+    state.quizComplete = true;
+    markActivity();
+    saveSession();
+  }
+
+  function resetTyping() {
+    state.typingIndex = 0;
+    state.typingInput = "";
+    state.typingFeedback = null;
   }
 
   function getTypingCard() {
-    return getLesson().vocabulary[state.typingIndex % getLesson().vocabulary.length];
+    const lesson = getPracticeLesson();
+    return lesson.vocabulary[state.typingIndex % lesson.vocabulary.length];
   }
 
-  function getLessonSlides(lesson) {
-    const phraseOne = lesson.phrases[0];
-    const phraseTwo = lesson.phrases[1];
-    const vocabPreview = lesson.vocabulary.slice(0, 4);
-    return [
-      {
-        kind: "note",
-        label: "Grammar Note",
-        title: lesson.label,
-        body: `${lesson.focus}. ${phraseOne ? phraseOne.english : "Start this lesson by noticing the core pattern and repeating it aloud."}`,
-        footer: phraseOne ? phraseOne.arabic : lesson.focus
-      },
-      {
-        kind: "phrase",
-        label: "Key Phrase",
-        title: phraseOne ? phraseOne.english : "Core phrase",
-        arabic: phraseOne ? phraseOne.arabic : lesson.vocabulary[0]?.arabic || "",
-        body: phraseTwo ? phraseTwo.english : "Read the Arabic, then say it out loud before moving on.",
-        footer: phraseTwo ? phraseTwo.arabic : lesson.sourcePage
-      },
-      {
-        kind: "vocab",
-        label: "Vocabulary",
-        title: `${lesson.vocabulary.length} words in this lesson`,
-        vocab: vocabPreview,
-        body: "Preview the lesson vocabulary, then open practice to drill it with flashcards, matching, typing, and pronunciation.",
-        footer: lesson.sourcePage
-      }
-    ];
+  function nextTypingCard() {
+    state.typingIndex = (state.typingIndex + 1) % getPracticeLesson().vocabulary.length;
+    state.typingInput = "";
+    state.typingFeedback = null;
   }
 
-  function escapeHtml(value) {
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  function resetPronunciation() {
+    state.pronunciationIndex = 0;
+    state.pronunciationFeedback = null;
+    state.pronunciationTranscript = "";
   }
 
-  function renderDashboard() {
-    if (state.lessonDetailOpen) {
-      return renderLessonDetail();
-    }
+  function nextPronunciationPrompt() {
+    state.pronunciationIndex = (state.pronunciationIndex + 1) % pronunciationPool().length;
+    state.pronunciationFeedback = null;
+    state.pronunciationTranscript = "";
+  }
+
+  function setPracticeMode(mode) {
+    state.practiceMode = mode;
+    if (mode === "quiz") resetQuizRound();
+    if (mode === "flashcards") resetFlashcards();
+    if (mode === "matching") resetMatchRound();
+    if (mode === "typing") resetTyping();
+    if (mode === "pronunciation") resetPronunciation();
+  }
+
+  function resetPracticeSelection(lessonId) {
+    state.practiceLessonId = lessonId;
+    ensureLessonProgressStarted(lessonId);
+    state.practiceMode = null;
+    resetQuizRound();
+    state.flashDeck = [];
+    state.flashKnown = [];
+    state.flashUnknown = [];
+    state.flashRoundComplete = false;
+    state.matchRound = [];
+    state.matchSelection = [];
+    state.matchSolved = [];
+    state.matchFeedback = "";
+    resetTyping();
+    resetPronunciation();
+    saveSession();
+  }
+
+  function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "صباح الخير — Good morning";
+    if (hour < 18) return "مساء الخير — Good afternoon";
+    return "مساء الخير — Good evening";
+  }
+
+  function renderStatusPill(status) {
+    const labels = {
+      not_started: "Not started",
+      in_progress: "In progress",
+      completed: "Completed"
+    };
+    return `<span class="status-pill is-${status}">${labels[status] || status}</span>`;
+  }
+
+  function renderHome() {
     const overall = computeOverallStats();
-    const categories = ["All", "Madinah Book", "Vocabulary", "Typing", "Pronunciation"];
-    const levels = ["All levels", "Beginner", "Core vocab", "Review"];
+    const nextLessons = lessons
+      .filter((lesson) => computeLessonStats(lesson).status !== "completed")
+      .slice(0, 3);
+
+    return `
+      <section class="panel home-screen">
+        <div class="home-scroll">
+          <div class="home-hero-card">
+            <div class="home-hero-copy">
+              <p class="home-greeting">${getGreeting()}</p>
+              <h1>Madinah Lab</h1>
+              <p>Build strong Madinah Book 1 vocabulary first, then layer in phrases, typing, and pronunciation practice.</p>
+            </div>
+            <div class="home-ring-card">
+              <div class="home-ring-value">${overall.overallProgress}%</div>
+              <div class="home-ring-label">Complete</div>
+            </div>
+          </div>
+
+          <div class="home-stats-grid">
+            <div class="summary-card">
+              <strong>${overall.completedCount}</strong>
+              <span>Lessons completed</span>
+            </div>
+            <div class="summary-card">
+              <strong>${overall.totalXp}</strong>
+              <span>Total XP</span>
+            </div>
+            <div class="summary-card">
+              <strong>${overall.streak}</strong>
+              <span>Current streak</span>
+            </div>
+            <div class="summary-card">
+              <strong>${overall.averageScore || "—"}</strong>
+              <span>Average score</span>
+            </div>
+          </div>
+
+          <div class="section-block">
+            <div class="section-head">
+              <div>
+                <h2>Continue Learning</h2>
+                <p>Pick up where you left off in this session.</p>
+              </div>
+              <button class="mini-button" data-action="change-section" data-section="lessons">View all</button>
+            </div>
+            <div class="lesson-list compact">
+              ${
+                nextLessons.length
+                  ? nextLessons
+                      .map(
+                        (lesson) => `
+                          <button class="lesson-list-card compact" data-action="open-lesson" data-lesson-id="${lesson.id}">
+                            <div class="lesson-list-icon">${lesson.icon}</div>
+                            <div class="lesson-list-body">
+                              <div class="lesson-badge">Beginner</div>
+                              <h3>${lesson.title}</h3>
+                              <div class="lesson-arabic arabic-text">${lesson.title_ar}</div>
+                              <div class="lesson-meta-row">
+                                <span>${lesson.estimated_minutes} min</span>
+                                <span>${lesson.xp_reward} XP</span>
+                              </div>
+                            </div>
+                          </button>
+                        `
+                      )
+                      .join("")
+                  : `<div class="empty-card">Everything in this session is marked complete. Open practice to keep drilling vocabulary.</div>`
+              }
+            </div>
+          </div>
+
+          <div class="section-block">
+            <div class="section-head">
+              <div>
+                <h2>Quick Start</h2>
+                <p>Jump straight into your next study block.</p>
+              </div>
+            </div>
+            <div class="quick-action-grid">
+              <button class="quick-action-card" data-action="change-section" data-section="alphabet">
+                <div class="quick-action-icon">أ</div>
+                <div>
+                  <strong>Arabic Alphabet</strong>
+                  <span>Learn the 28 letters with audio</span>
+                </div>
+              </button>
+              <button class="quick-action-card" data-action="start-practice" data-lesson-id="${getPracticeLesson().id}" data-mode="flashcards">
+                <div class="quick-action-icon">🎙</div>
+                <div>
+                  <strong>Practice Session</strong>
+                  <span>Flashcards, typing, matching, and pronunciation</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderLessons() {
+    if (state.lessonDetailOpen) return renderLessonDetail();
+    const visibleLessons = filteredLessons();
+
     return `
       <section class="panel lessons-screen">
         <div class="screen-head">
-          <div>
-            <h2>Lessons</h2>
-            <p>Madinah Book 1 first, with session progress only.</p>
+          <button class="back-button" data-action="change-section" data-section="home">&larr;</button>
+          <div class="practice-title-wrap">
+            <h2>الدروس</h2>
+            <p>Prioritizing Fusha and Madinah Book 1. Progress is saved only for this browser session.</p>
           </div>
         </div>
-        <div class="lesson-strip category-strip">
-          ${categories
-            .map(
-              (entry, index) => `
-                <button class="lesson-chip ${index === 0 ? "is-active" : ""}">
-                  <strong>${entry}</strong>
+        <div class="lessons-scroll">
+          <div class="search-shell">
+            <input class="search-input" data-input="lesson-search" placeholder="ابحث في الدروس..." value="${escapeHtml(state.lessonSearch)}" />
+          </div>
+
+          <div class="lesson-strip category-strip">
+            ${CATEGORY_OPTIONS.map(
+              (option) => `
+                <button class="lesson-chip ${state.lessonFilterCategory === option.key ? "is-active" : ""}" data-action="set-lesson-category" data-category="${option.key}">
+                  <strong>${option.label}</strong>
                 </button>
               `
-            )
-            .join("")}
-        </div>
-        <div class="strip-scrollbar" aria-hidden="true"><span></span></div>
-        <div class="mode-row level-strip">
-          ${levels
-            .map(
-              (entry, index) => `
-                <button class="mode-chip ${index === 0 ? "is-active" : ""}">
-                  <strong>${entry}</strong>
+            ).join("")}
+          </div>
+
+          <div class="mode-row level-strip">
+            ${LEVEL_OPTIONS.map(
+              (option) => `
+                <button class="mode-chip ${state.lessonFilterLevel === option.key ? "is-active" : ""}" data-action="set-lesson-level" data-level="${option.key}">
+                  <strong>${option.label}</strong>
                 </button>
               `
-            )
-            .join("")}
-        </div>
-        <div class="lesson-list">
-          ${lessons
-            .map((lesson) => {
-              const stats = computeLessonStats(lesson);
-              const subtitle = lesson.phrases[0]?.arabic || lesson.vocabulary[0]?.arabic || "";
-              return `
-                <button class="lesson-list-card" data-action="open-lesson" data-lesson-id="${lesson.id}">
-                  <div class="lesson-list-icon lesson-index">${lesson.sequence}</div>
-                  <div class="lesson-list-body">
-                    <div class="lesson-badge">Beginner</div>
-                    <h3>${lesson.label} - ${lesson.focus}</h3>
-                    <div class="lesson-arabic arabic-text">${subtitle}</div>
-                    <p>${lesson.vocabulary.length} vocabulary cards with flashcards, matching, typing, and pronunciation practice.</p>
-                    <div class="lesson-meta-row">
-                      <span>10 min</span>
-                      <span>${Math.max(25, lesson.vocabulary.length * 5)} XP</span>
-                      <span>${stats.percent}%</span>
-                    </div>
-                  </div>
-                  <div class="lesson-chevron">&rsaquo;</div>
-                </button>
-              `;
-            })
-            .join("")}
-        </div>
-        <div class="home-summary">
-          <div class="summary-card">
-            <strong>${overall.reviewedCards}</strong>
-            <span>Cards touched</span>
+            ).join("")}
           </div>
-          <div class="summary-card">
-            <strong>${overall.masteredCards}</strong>
-            <span>Strong cards</span>
+
+          <div class="lesson-list">
+            ${
+              visibleLessons.length
+                ? visibleLessons
+                    .map((lesson) => {
+                      const stats = computeLessonStats(lesson);
+                      return `
+                        <button class="lesson-list-card" data-action="open-lesson" data-lesson-id="${lesson.id}">
+                          <div class="lesson-list-icon">${lesson.icon}</div>
+                          <div class="lesson-list-body">
+                            <div class="lesson-card-top">
+                              <div class="lesson-badge">${lesson.level}</div>
+                              ${renderStatusPill(stats.status)}
+                            </div>
+                            <h3>${lesson.title}</h3>
+                            <div class="lesson-arabic arabic-text">${lesson.title_ar}</div>
+                            <p>${lesson.description}</p>
+                            <div class="lesson-meta-row">
+                              <span>${lesson.estimated_minutes} min</span>
+                              <span>${lesson.xp_reward} XP</span>
+                              <span>${stats.percent}%</span>
+                            </div>
+                          </div>
+                          <div class="lesson-chevron">&rsaquo;</div>
+                        </button>
+                      `;
+                    })
+                    .join("")
+                : `<div class="empty-card">No lessons matched that filter. Try another category or search.</div>`
+            }
           </div>
-          <div class="summary-card">
-            <strong>${overall.streak}</strong>
-            <span>Study streak</span>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderLessonItem(item, answer, quizAction) {
+    if (item.type === "vocab" || item.type === "phrase") {
+      return `
+        <div class="lesson-detail-label">${item.type === "vocab" ? "Vocabulary" : "Phrase"}</div>
+        <div class="lesson-word-card">
+          <div class="lesson-word-arabic arabic-text">${item.arabic}</div>
+          ${item.transliteration ? `<div class="lesson-word-transliteration">${item.transliteration}</div>` : ""}
+          <div class="lesson-word-english">${item.english}</div>
+          <button class="speaker-button" data-action="speak-text" data-text="${escapeHtml(item.arabic)}">Listen</button>
+          ${item.audio_hint ? `<div class="lesson-note-bubble">${item.audio_hint}</div>` : ""}
+        </div>
+      `;
+    }
+
+    if (item.type === "grammar_note") {
+      return `
+        <div class="lesson-detail-label is-secondary">Grammar Note</div>
+        <div class="lesson-note-card">
+          ${item.arabic ? `<div class="lesson-note-arabic arabic-text">${item.arabic}</div>` : ""}
+          <p>${item.english}</p>
+          ${item.transliteration ? `<div class="lesson-word-transliteration">${item.transliteration}</div>` : ""}
+          ${item.audio_hint ? `<div class="lesson-note-bubble">${item.audio_hint}</div>` : ""}
+        </div>
+      `;
+    }
+
+    if (item.type === "quiz") {
+      return `
+        <div class="lesson-detail-label">Quiz</div>
+        <div class="lesson-note-card">
+          <h3>${item.english}</h3>
+          <div class="quiz-options">
+            ${(item.options || [])
+              .map((option) => {
+                const isSelected = answer === option;
+                const isCorrect = option === item.correct_answer;
+                const quizClass = answer
+                  ? isCorrect
+                    ? "is-correct"
+                    : isSelected
+                      ? "is-wrong"
+                      : ""
+                  : isSelected
+                    ? "is-selected"
+                    : "";
+                return `
+                  <button class="quiz-option ${quizClass}" data-action="${quizAction}" data-option="${escapeHtml(option)}" ${answer ? "disabled" : ""}>
+                    <span class="arabic-text">${option}</span>
+                  </button>
+                `;
+              })
+              .join("")}
+          </div>
+          ${
+            answer
+              ? `<div class="feedback ${answer === item.correct_answer ? "is-good" : "is-bad"}">${
+                  answer === item.correct_answer ? "Correct." : `Correct answer: <span class="arabic-text">${item.correct_answer}</span>`
+                }</div>`
+              : `<div class="muted">Choose the right Arabic word to continue.</div>`
+          }
+        </div>
+      `;
+    }
+
+    return "";
+  }
+
+  function renderLessonComplete(lesson) {
+    const quizItems = lesson.content.filter((item) => item.type === "quiz");
+    const correct = quizItems.reduce((count, item) => {
+      const itemIndex = lesson.content.findIndex((candidate) => candidate.id === item.id);
+      return count + (state.lessonAnswers[itemIndex] === item.correct_answer ? 1 : 0);
+    }, 0);
+    const score = quizItems.length ? Math.round((correct / quizItems.length) * 100) : 100;
+
+    return `
+      <section class="panel lesson-detail-screen">
+        <div class="practice-screen-head">
+          <button class="back-button" data-action="close-lesson-detail">&larr;</button>
+          <div class="practice-title-wrap">
+            <h2>${lesson.title}</h2>
+            <p>Lesson complete</p>
+          </div>
+        </div>
+        <div class="lesson-detail-body">
+          <div class="lesson-complete-card">
+            <div class="lesson-complete-icon">★</div>
+            <h3>Lesson Complete</h3>
+            <p>${lesson.title}</p>
+            <div class="lesson-complete-stats">
+              <div class="summary-card">
+                <strong>+${lesson.xp_reward}</strong>
+                <span>XP earned</span>
+              </div>
+              <div class="summary-card">
+                <strong>${score}%</strong>
+                <span>Quiz score</span>
+              </div>
+            </div>
+            <div class="lesson-detail-actions">
+              <button class="lesson-nav-button" data-action="close-lesson-detail">Back to lessons</button>
+              <button class="lesson-nav-button is-primary" data-action="start-practice" data-lesson-id="${lesson.id}" data-mode="flashcards">Practice now</button>
+            </div>
           </div>
         </div>
       </section>
@@ -472,77 +1038,233 @@
 
   function renderLessonDetail() {
     const lesson = getLesson();
-    const slides = getLessonSlides(lesson);
-    const currentSlide = slides[state.lessonSlideIndex] || slides[0];
-    const progress = ((state.lessonSlideIndex + 1) / slides.length) * 100;
+    if (state.lessonCompleted) return renderLessonComplete(lesson);
+
+    const items = lesson.content;
+    const currentItem = items[state.lessonContentIndex];
+    const answer = state.lessonAnswers[state.lessonContentIndex];
+    const progressValue = items.length ? Math.round(((state.lessonContentIndex + 1) / items.length) * 100) : 0;
+
     return `
       <section class="panel lesson-detail-screen">
         <div class="practice-screen-head">
           <button class="back-button" data-action="close-lesson-detail">&larr;</button>
           <div class="practice-title-wrap">
-            <h2>${lesson.label} - ${lesson.focus}</h2>
-            <p>${state.lessonSlideIndex + 1} of ${slides.length}</p>
+            <h2>${lesson.title}</h2>
+            <p>${state.lessonContentIndex + 1} of ${items.length}</p>
           </div>
         </div>
-        <div class="practice-progress"><span style="width:${progress}%;"></span></div>
+        <div class="practice-progress"><span style="width:${progressValue}%;"></span></div>
         <div class="lesson-detail-body">
           <article class="lesson-detail-card">
-            <div class="lesson-detail-label">${currentSlide.label}</div>
-            <h3>${currentSlide.title}</h3>
-            ${currentSlide.arabic ? `<div class="lesson-detail-arabic arabic-text">${currentSlide.arabic}</div>` : ""}
-            ${
-              currentSlide.vocab
-                ? `
-                  <div class="lesson-detail-vocab-grid">
-                    ${currentSlide.vocab
-                      .map(
-                        (entry) => `
-                          <div class="lesson-detail-vocab-row">
-                            <strong class="arabic-text">${entry.arabic}</strong>
-                            <span>${entry.english}</span>
-                          </div>
-                        `
-                      )
-                      .join("")}
-                  </div>
-                `
-                : ""
-            }
-            <p>${currentSlide.body}</p>
-            <div class="lesson-detail-footer ${currentSlide.arabic || currentSlide.footer?.match(/[ء-ي]/) ? "arabic-text" : ""}">${currentSlide.footer || ""}</div>
+            ${renderLessonItem(currentItem, answer, "answer-lesson-quiz")}
           </article>
           <div class="lesson-detail-actions">
-            <button
-              class="lesson-nav-button ${state.lessonSlideIndex === 0 ? "is-disabled" : ""}"
-              data-action="lesson-detail-prev"
-              ${state.lessonSlideIndex === 0 ? "disabled" : ""}
-            >
-              &larr; Previous
+            <button class="lesson-nav-button ${state.lessonContentIndex === 0 ? "is-disabled" : ""}" data-action="lesson-prev" ${state.lessonContentIndex === 0 ? "disabled" : ""}>← Previous</button>
+            <button class="lesson-nav-button is-primary" data-action="${state.lessonContentIndex === items.length - 1 ? "complete-lesson" : "lesson-next"}" ${currentItem.type === "quiz" && !answer ? "disabled" : ""}>
+              ${state.lessonContentIndex === items.length - 1 ? "Complete" : "Next →"}
             </button>
-            ${
-              state.lessonSlideIndex === slides.length - 1
-                ? `<button class="lesson-nav-button is-primary" data-action="start-practice-from-detail">Practice &rarr;</button>`
-                : `<button class="lesson-nav-button is-primary" data-action="lesson-detail-next">Next &rarr;</button>`
-            }
           </div>
         </div>
       </section>
     `;
   }
 
+  function renderAlphabet() {
+    return `
+      <section class="panel alphabet-screen">
+        <div class="screen-head">
+          <button class="back-button" data-action="change-section" data-section="home">&larr;</button>
+          <div class="practice-title-wrap">
+            <h2>الحروف الهجائية</h2>
+            <p>Tap a letter to hear it and review its sound.</p>
+          </div>
+        </div>
+        <div class="alphabet-scroll">
+          <div class="alphabet-grid">
+            ${ARABIC_ALPHABET.map(
+              (item) => `
+                <button class="alphabet-card" data-action="open-alphabet-letter" data-letter="${item.letter}">
+                  <div class="alphabet-letter arabic-text">${item.letter}</div>
+                  <div class="alphabet-name">${item.name}</div>
+                  <div class="alphabet-sound">${item.transliteration}</div>
+                </button>
+              `
+            ).join("")}
+          </div>
+          ${
+            state.alphabetSelected
+              ? `
+                <div class="modal-scrim" data-action="close-alphabet-letter">
+                  <div class="alphabet-modal" data-stop-click="true">
+                    <button class="modal-close" data-action="close-alphabet-letter">×</button>
+                    <div class="alphabet-modal-letter arabic-text">${state.alphabetSelected.letter}</div>
+                    <h3>${state.alphabetSelected.name}</h3>
+                    <div class="lesson-word-transliteration">/${state.alphabetSelected.transliteration}/</div>
+                    <p>${state.alphabetSelected.sound}</p>
+                    <button class="lesson-nav-button is-primary" data-action="speak-text" data-text="${state.alphabetSelected.letter}">Listen again</button>
+                  </div>
+                </div>
+              `
+              : ""
+          }
+        </div>
+      </section>
+    `;
+  }
+
+  function renderPracticeModeChooser() {
+    return `
+      <div class="practice-mode-list">
+        ${PRACTICE_MODES.map(
+          (mode) => `
+            <button class="practice-mode-card" data-action="select-practice-mode" data-mode="${mode.key}">
+              <div class="practice-mode-icon">${mode.icon}</div>
+              <div class="practice-mode-copy">
+                <strong>${mode.label}</strong>
+                <span>${mode.labelAr}</span>
+                <p>${mode.note}</p>
+              </div>
+              <div class="lesson-chevron">&rsaquo;</div>
+            </button>
+          `
+        ).join("")}
+      </div>
+    `;
+  }
+
+  function renderFlashcardsComplete() {
+    return `
+      <div class="lesson-complete-card">
+        <div class="lesson-complete-icon">📚</div>
+        <h3>Round complete</h3>
+        <p>You cleared the current flashcard queue.</p>
+        <div class="lesson-complete-stats">
+          <div class="summary-card">
+            <strong>${state.flashKnown.length}</strong>
+            <span>I know it</span>
+          </div>
+          <div class="summary-card">
+            <strong>${state.flashUnknown.length}</strong>
+            <span>Need review</span>
+          </div>
+        </div>
+        <div class="lesson-detail-actions">
+          ${state.flashUnknown.length ? `<button class="lesson-nav-button is-primary" data-action="practice-flash-missed">Review missed</button>` : ""}
+          <button class="lesson-nav-button" data-action="restart-flash-round">Shuffle all again</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderQuizPractice() {
+    const lesson = getPracticeLesson();
+    const currentItem = currentQuizItem();
+    const answer = state.quizAnswers[state.quizIndex];
+
+    if (state.quizComplete) {
+      const correct = quizScore();
+      const score = state.quizRound.length ? Math.round((correct / state.quizRound.length) * 100) : 100;
+      return `
+        <div class="lesson-complete-card chapter-summary-card">
+          <div class="lesson-complete-icon">❓</div>
+          <h3>Quiz complete</h3>
+          <p>${lesson.title}</p>
+          <div class="lesson-complete-stats">
+            <div class="summary-card">
+              <strong>${correct}/${state.quizRound.length}</strong>
+              <span>Correct answers</span>
+            </div>
+            <div class="summary-card">
+              <strong>${score}%</strong>
+              <span>Score</span>
+            </div>
+          </div>
+          <div class="lesson-detail-actions">
+            <button class="lesson-nav-button" data-action="restart-quiz-round">Restart quiz</button>
+            <button class="lesson-nav-button is-primary" data-action="toggle-quiz-direction">Switch direction</button>
+          </div>
+        </div>
+      `;
+    }
+
+    if (!currentItem) {
+      return `<div class="empty-card">No quiz items are available for this lesson yet.</div>`;
+    }
+
+    return `
+      <div class="toolbar">
+        <div class="toolbar-row">
+          <div class="segmented">
+            <button class="${state.quizDirection === "en-to-ar" ? "is-active" : ""}" data-action="set-quiz-direction" data-direction="en-to-ar">English → Arabic</button>
+            <button class="${state.quizDirection === "ar-to-en" ? "is-active" : ""}" data-action="set-quiz-direction" data-direction="ar-to-en">Arabic → English</button>
+          </div>
+          <button class="mini-button" data-action="restart-quiz-round">New quiz</button>
+        </div>
+      </div>
+      <div class="chapter-practice-card lesson-detail-card">
+        <div class="chapter-progress-meta">${state.quizIndex + 1} / ${state.quizRound.length}</div>
+        <div class="lesson-detail-label">Quiz</div>
+        <div class="lesson-note-card">
+          <div class="muted">${currentItem.promptHint}</div>
+          <div class="${currentItem.direction === "ar-to-en" ? "lesson-word-arabic arabic-text" : "quiz-prompt-text"}">${currentItem.prompt}</div>
+          <div class="quiz-options">
+            ${currentItem.options
+              .map((option) => {
+                const isSelected = answer === option;
+                const isCorrect = option === currentItem.correct_answer;
+                const quizClass = answer
+                  ? isCorrect
+                    ? "is-correct"
+                    : isSelected
+                      ? "is-wrong"
+                      : ""
+                  : isSelected
+                    ? "is-selected"
+                    : "";
+                return `
+                  <button class="quiz-option ${quizClass}" data-action="answer-practice-quiz" data-option="${escapeHtml(option)}" ${answer ? "disabled" : ""}>
+                    <span class="${currentItem.direction === "en-to-ar" ? "arabic-text" : ""}">${option}</span>
+                  </button>
+                `;
+              })
+              .join("")}
+          </div>
+          ${
+            answer
+              ? `<div class="feedback ${answer === currentItem.correct_answer ? "is-good" : "is-bad"}">${
+                  answer === currentItem.correct_answer ? "Correct." : `Correct answer: <span class="${currentItem.direction === "en-to-ar" ? "arabic-text" : ""}">${currentItem.correct_answer}</span>`
+                }</div>`
+              : `<div class="muted">Choose 1 of 4 answers.</div>`
+          }
+        </div>
+      </div>
+      <div class="lesson-detail-actions chapter-practice-actions">
+        <button class="lesson-nav-button ${state.quizIndex === 0 ? "is-disabled" : ""}" data-action="quiz-prev" ${state.quizIndex === 0 ? "disabled" : ""}>← Previous</button>
+        <button class="lesson-nav-button is-primary" data-action="${state.quizIndex === state.quizRound.length - 1 ? "quiz-complete" : "quiz-next"}" ${!answer ? "disabled" : ""}>
+          ${state.quizIndex === state.quizRound.length - 1 ? "Finish quiz" : "Next →"}
+        </button>
+      </div>
+    `;
+  }
+
   function renderFlashcards() {
-    const lesson = getLesson();
+    if (state.flashRoundComplete) return renderFlashcardsComplete();
+    const lesson = getPracticeLesson();
     const card = currentFlashCard();
+    if (!card) return `<div class="empty-card">No flashcards are available for this lesson yet.</div>`;
+
     const promptIsArabic = card.direction === "ar-to-en";
     const prompt = promptIsArabic ? card.entry.arabic : card.entry.english;
     const answer = promptIsArabic ? card.entry.english : card.entry.arabic;
+
     return `
       <div class="toolbar">
         <div class="toolbar-row">
           <div class="segmented">
             ${[
-                ["en-to-ar", "EN to AR"],
-                ["ar-to-en", "AR to EN"],
+              ["ar-to-en", "عربي ← إنجليزي"],
+              ["en-to-ar", "إنجليزي ← عربي"],
               ["mixed", "Mixed"]
             ]
               .map(
@@ -554,61 +1276,40 @@
               )
               .join("")}
           </div>
-          <button class="pill-button ${state.flashShuffle ? "is-on" : ""}" data-action="toggle-flash-shuffle">Shuffle deck</button>
+          <button class="pill-button ${state.flashShuffle ? "is-on" : ""}" data-action="toggle-flash-shuffle">Shuffle</button>
           <button class="mini-button" data-action="speak-current">Hear Arabic</button>
         </div>
+      </div>
+      <div class="flash-score-row">
+        <span class="score-pill is-good">✓ أعرف: ${state.flashKnown.length}</span>
+        <span class="score-pill is-bad">✗ لا أعرف: ${state.flashUnknown.length}</span>
       </div>
       <div class="flashcard">
         <div class="flashcard-top">
           <div class="flashcard-tag">${lesson.label}</div>
-          <div class="flashcard-tag">${flashCardPosition()} / ${flashRoundTotal()}</div>
+          <div class="flashcard-tag">${flashCardPosition()} / ${state.flashRoundTotal}</div>
         </div>
         <div class="flashcard-main">
           <div class="subcopy">${card.direction === "en-to-ar" ? "English to Arabic" : "Arabic to English"}</div>
           <div class="prompt ${promptIsArabic ? "arabic-text" : ""}">${prompt}</div>
-          <div class="answer ${!state.flashRevealed ? "is-hidden" : ""} ${!promptIsArabic ? "arabic-text" : ""}">
-            ${answer}
-          </div>
-          <div class="subcopy">Focus: ${lesson.focus}</div>
+          <div class="answer ${!state.flashRevealed ? "is-hidden" : ""} ${!promptIsArabic ? "arabic-text" : ""}">${answer}</div>
+          <div class="subcopy">${lesson.focus}</div>
         </div>
         <div class="flash-actions">
-          <button class="flash-action is-red" data-action="grade-flashcard" data-result="unknown">
-            Don't know
-            <small>mark weak</small>
-          </button>
-          <button class="flash-action is-gold" data-action="toggle-flash-answer">
-            ${state.flashRevealed ? "Hide meaning" : "Check definition"}
-            <small>peek first</small>
-          </button>
-          <button class="flash-action is-green" data-action="grade-flashcard" data-result="known">
-            I know it
-            <small>mark strong</small>
-          </button>
+          <button class="flash-action is-red" data-action="grade-flashcard" data-result="unknown">Don't know<small>retry later</small></button>
+          <button class="flash-action is-gold" data-action="toggle-flash-answer">${state.flashRevealed ? "Hide meaning" : "Check definition"}<small>peek first</small></button>
+          <button class="flash-action is-green" data-action="grade-flashcard" data-result="known">I know it<small>remove card</small></button>
         </div>
-      </div>
-      <div class="phrase-stack" style="margin-top:18px;">
-        ${lesson.phrases
-          .slice(0, 2)
-          .map(
-            (phrase) => `
-              <div class="phrase-line">
-                <strong class="arabic-text">${phrase.arabic}</strong>
-                <span class="muted">${phrase.english}</span>
-              </div>
-            `
-          )
-          .join("")}
       </div>
     `;
   }
 
   function renderMatching() {
-    const solvedCount = state.matchSolved.length;
     return `
       <div class="toolbar">
         <div class="toolbar-row">
           <button class="mini-button" data-action="reset-matching">New round</button>
-          <span class="muted">${solvedCount / 2} pairs solved</span>
+          <span class="muted">${state.matchSolved.length / 2} pairs solved</span>
         </div>
       </div>
       <div class="match-grid">
@@ -617,18 +1318,14 @@
             const isSolved = state.matchSolved.includes(item.id);
             const isSelected = state.matchSelection.includes(item.id);
             return `
-              <button
-                class="match-card ${item.side === "arabic" ? "arabic-text" : ""} ${isSolved ? "is-matched" : ""} ${isSelected ? "is-selected" : ""}"
-                data-action="pick-match"
-                data-card-id="${item.id}"
-              >
+              <button class="match-card ${item.side === "arabic" ? "arabic-text" : ""} ${isSolved ? "is-matched" : ""} ${isSelected ? "is-selected" : ""}" data-action="pick-match" data-card-id="${item.id}">
                 ${item.label}
               </button>
             `;
           })
           .join("")}
       </div>
-      ${state.matchFeedback ? `<div class="feedback ${state.matchFeedback.includes("Nice") ? "is-good" : "is-bad"}">${state.matchFeedback}</div>` : ""}
+      ${state.matchFeedback ? `<div class="feedback ${state.matchFeedback.startsWith("Nice") ? "is-good" : "is-bad"}">${state.matchFeedback}</div>` : ""}
     `;
   }
 
@@ -636,6 +1333,7 @@
     const card = getTypingCard();
     const targetLanguage = state.typingDirection === "en-to-ar" ? "arabic" : "english";
     const prompt = targetLanguage === "arabic" ? card.english : card.arabic;
+
     return `
       <div class="toolbar">
         <div class="toolbar-row">
@@ -661,25 +1359,14 @@
         <div class="typing-prompt">
           <strong>${targetLanguage === "arabic" ? "Type the Arabic word" : "Type the English meaning"}</strong>
           <div class="${targetLanguage === "english" ? "arabic-text" : ""}">${prompt}</div>
-          <div class="muted" style="margin-top:8px;">${state.typingStrict ? "Strict mode expects the harakat too." : "Relaxed mode ignores most harakat differences."}</div>
+          <div class="muted">${state.typingStrict ? "Strict mode expects the harakat too." : "Relaxed mode ignores most harakat differences."}</div>
         </div>
-        <input
-          class="typing-input"
-          data-action="typing-input"
-          dir="${targetLanguage === "arabic" ? "rtl" : "ltr"}"
-          lang="${targetLanguage === "arabic" ? "ar" : "en"}"
-          value="${escapeHtml(state.typingInput)}"
-          placeholder="${targetLanguage === "arabic" ? "اكتب هنا" : "Type here"}"
-        />
+        <input class="typing-input" data-input="typing-input" dir="${targetLanguage === "arabic" ? "rtl" : "ltr"}" lang="${targetLanguage === "arabic" ? "ar" : "en"}" value="${escapeHtml(state.typingInput)}" placeholder="${targetLanguage === "arabic" ? "اكتب هنا" : "Type here"}" />
         ${
           targetLanguage === "arabic"
-            ? `
-              <div class="typing-pad">
-                ${["َ", "ِ", "ُ", "ْ", "ّ", "ً", "ٍ", "ٌ", "ة", "ى"]
-                  .map((character) => `<button data-action="insert-char" data-char="${character}">${character}</button>`)
-                  .join("")}
-              </div>
-            `
+            ? `<div class="typing-pad">${["َ", "ِ", "ُ", "ْ", "ّ", "ً", "ٍ", "ٌ", "ة", "ى"]
+                .map((character) => `<button data-action="insert-char" data-char="${character}">${character}</button>`)
+                .join("")}</div>`
             : ""
         }
         <div class="typing-actions">
@@ -689,12 +1376,7 @@
         </div>
         ${
           state.typingFeedback
-            ? `
-              <div class="feedback ${state.typingFeedback.correct ? "is-good" : "is-bad"}">
-                ${state.typingFeedback.message}
-                ${state.typingFeedback.expected ? `<div style="margin-top:6px;"><strong>Expected:</strong> ${state.typingFeedback.expected}</div>` : ""}
-              </div>
-            `
+            ? `<div class="feedback ${state.typingFeedback.correct ? "is-good" : "is-bad"}">${state.typingFeedback.message}${state.typingFeedback.expected ? `<div class="feedback-inline"><strong>Expected:</strong> ${state.typingFeedback.expected}</div>` : ""}</div>`
             : ""
         }
       </div>
@@ -705,104 +1387,88 @@
     const supported = supportsSpeechRecognition();
     const prompt = pronunciationPool()[state.pronunciationIndex];
     const score = state.pronunciationFeedback ? state.pronunciationFeedback.score : 0;
+
     return `
       <div class="pronunciation-card">
         <div class="toolbar">
           <div class="toolbar-row">
             <button class="mini-button" data-action="next-pronunciation">Next phrase</button>
             <button class="mini-button" data-action="speak-current">Hear Arabic</button>
-            ${
-              supported
-                ? `<button class="pill-button ${state.pronunciationListening ? "is-on" : ""}" data-action="toggle-listening">${state.pronunciationListening ? "Listening..." : "Start mic"}</button>`
-                : `<span class="muted">Speech recognition is not available in this browser.</span>`
-            }
+            ${supported ? `<button class="pill-button ${state.pronunciationListening ? "is-on" : ""}" data-action="toggle-listening">${state.pronunciationListening ? "Listening..." : "Start mic"}</button>` : `<span class="muted">Speech recognition is not available in this browser.</span>`}
           </div>
         </div>
         <div class="pronunciation-target">
-          <strong>Speak this:</strong>
+          <strong>Speak this</strong>
           <div class="arabic-text">${prompt.arabic}</div>
-          <p class="muted" style="margin-top:8px;">${prompt.english}</p>
+          <p class="muted">${prompt.english}</p>
         </div>
-        <div class="summary-list" style="margin-top:18px;">
-          <div class="summary-card">
-            <strong>Live transcript</strong>
-            <span>${state.pronunciationTranscript || "Waiting for speech..."}</span>
-          </div>
+        <div class="summary-card transcript-card">
+          <strong>Live transcript</strong>
+          <span>${state.pronunciationTranscript || "Waiting for speech..."}</span>
         </div>
         <div class="meter"><span style="width:${score}%;"></span></div>
-        ${
-          state.pronunciationFeedback
-            ? `
-              <div class="feedback ${state.pronunciationFeedback.correct ? "is-good" : "is-bad"}">
-                ${
-                  state.pronunciationFeedback.message ||
-                  (state.pronunciationFeedback.correct
-                    ? "Strong match. The recognized Arabic was very close to the target."
-                    : "Keep going. This browser check compares recognized text, so treat it as a coach rather than a final pronunciation grade.")
-                }
-              </div>
-            `
-            : ""
-        }
+        ${state.pronunciationFeedback ? `<div class="feedback ${state.pronunciationFeedback.correct ? "is-good" : "is-bad"}">${state.pronunciationFeedback.message}</div>` : ""}
       </div>
     `;
   }
 
-  function renderModeBody() {
-    if (state.mode === "flashcards") return renderFlashcards();
-    if (state.mode === "matching") return renderMatching();
-    if (state.mode === "typing") return renderTyping();
+  function renderPracticeBody() {
+    if (!state.practiceMode) return renderPracticeModeChooser();
+    if (state.practiceMode === "quiz") return renderQuizPractice();
+    if (state.practiceMode === "flashcards") return renderFlashcards();
+    if (state.practiceMode === "matching") return renderMatching();
+    if (state.practiceMode === "typing") return renderTyping();
     return renderPronunciation();
   }
 
   function renderPractice() {
-    const lesson = getLesson();
+    const lesson = getPracticeLesson();
     const lessonStats = computeLessonStats(lesson);
     const progressValue =
-      state.mode === "flashcards"
-        ? Math.round((flashSolvedCount() / flashRoundTotal()) * 100)
-        : Math.max(8, lessonStats.percent);
+      state.practiceMode === "quiz"
+        ? state.quizComplete
+          ? 100
+          : Math.round((state.quizIndex / Math.max(state.quizRound.length, 1)) * 100)
+        : state.practiceMode === "flashcards"
+        ? state.flashRoundComplete
+          ? 100
+          : Math.round((flashSolvedCount() / Math.max(state.flashRoundTotal || 1, 1)) * 100)
+        : lessonStats.percent;
+
     return `
       <section class="panel practice-screen">
         <div class="practice-screen-head">
-          <button class="back-button" data-action="change-section" data-section="dashboard">&larr;</button>
+          <button class="back-button" data-action="${state.practiceMode ? "back-practice-modes" : "change-section"}" data-section="home">&larr;</button>
           <div class="practice-title-wrap">
-            <h2>${lesson.label} - ${lesson.focus}</h2>
-            <p>${flashCardPosition()} of ${lesson.vocabulary.length}</p>
+            <h2>${lesson.title}</h2>
+            <p>${state.practiceMode ? PRACTICE_MODES.find((mode) => mode.key === state.practiceMode)?.label || "Practice" : `${lesson.vocabulary.length} vocab items`}</p>
           </div>
         </div>
-        <div class="practice-progress"><span style="width:${progressValue}%;"></span></div>
+        <div class="practice-progress"><span style="width:${Math.max(progressValue, state.practiceMode ? 8 : 0)}%;"></span></div>
         <div class="practice-layout">
-          <div class="lesson-strip" style="padding:0 0 16px;">
+          <div class="lesson-strip">
             ${lessons
               .map(
                 (entry) => `
-                  <button class="lesson-chip ${entry.id === lesson.id ? "is-active" : ""}" data-action="pick-lesson" data-lesson-id="${entry.id}">
+                  <button class="lesson-chip ${entry.id === lesson.id ? "is-active" : ""}" data-action="change-practice-lesson" data-lesson-id="${entry.id}">
                     <strong>${entry.label}</strong>
-                    <span>${entry.vocabulary.length} vocab items</span>
                   </button>
                 `
               )
               .join("")}
           </div>
-          <div class="mode-row">
-            ${[
-              ["flashcards", "Flashcards", "Rapid recall"],
-              ["matching", "Matching", "Apply and pair"],
-              ["typing", "Typing", "Spell with haraqat"],
-              ["pronunciation", "Pronunciation", "Speak and compare"]
-            ]
-              .map(
-                ([mode, label, note]) => `
-                  <button class="mode-chip ${state.mode === mode ? "is-active" : ""}" data-action="change-mode" data-mode="${mode}">
-                    <strong>${label}</strong>
-                    <span>${note}</span>
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          <div class="practice-body">${renderModeBody()}</div>
+          ${
+            state.practiceMode
+              ? `<div class="mode-row">${PRACTICE_MODES.map(
+                  (mode) => `
+                    <button class="mode-chip ${state.practiceMode === mode.key ? "is-active" : ""}" data-action="select-practice-mode" data-mode="${mode.key}">
+                      <strong>${mode.label}</strong>
+                    </button>
+                  `
+                ).join("")}</div>`
+              : ""
+          }
+          <div class="practice-body">${renderPracticeBody()}</div>
         </div>
       </section>
     `;
@@ -810,99 +1476,96 @@
 
   function renderProgress() {
     const overall = computeOverallStats();
+
     return `
       <section class="panel progress-board">
         <div class="practice-screen-head">
-          <button class="back-button" data-action="change-section" data-section="dashboard">&larr;</button>
+          <button class="back-button" data-action="change-section" data-section="home">&larr;</button>
           <div class="practice-title-wrap">
             <h2>Session Progress</h2>
-            <p>Because you are hosting on GitHub Pages, this build stores progress only for the current browser session.</p>
+            <p>This GitHub Pages build saves only in session storage, so progress lasts until the session ends.</p>
           </div>
         </div>
         <div class="progress-content">
-          <div class="summary-grid" style="padding:0 22px 22px;">
+          <div class="home-stats-grid">
             <div class="summary-card">
               <strong>${overall.sessionAnswers}</strong>
-              <span>Total answers this session</span>
+              <span>Total answers</span>
             </div>
             <div class="summary-card">
               <strong>${overall.reviewedCards}</strong>
-              <span>Vocabulary items seen</span>
+              <span>Vocabulary seen</span>
             </div>
             <div class="summary-card">
-              <strong>${overall.masteredCards}</strong>
-              <span>Items currently trending strong</span>
+              <strong>${overall.totalXp}</strong>
+              <span>XP earned</span>
+            </div>
+            <div class="summary-card">
+              <strong>${overall.streak}</strong>
+              <span>Study streak</span>
             </div>
           </div>
-          <div class="summary-grid" style="padding:0 22px 22px;">
-            ${lessons
-              .map((lesson) => {
-                const stats = computeLessonStats(lesson);
-                return `
-                  <div class="progress-row">
-                    <strong>${lesson.label}</strong>
-                    <span class="muted">${lesson.focus}</span>
-                    <div class="progress-bar" style="margin-top:12px;"><span style="width:${stats.percent}%;"></span></div>
-                    <div class="muted" style="margin-top:10px;">${stats.mastered} / ${lesson.vocabulary.length} cards feeling solid this session</div>
-                  </div>
-                `;
-              })
-              .join("")}
+          <div class="section-block">
+            <div class="section-head">
+              <div>
+                <h2>Lesson Status</h2>
+                <p>Session-only progress per lesson.</p>
+              </div>
+            </div>
+            <div class="summary-grid progress-grid">
+              ${lessons
+                .map((lesson) => {
+                  const stats = computeLessonStats(lesson);
+                  return `
+                    <div class="progress-row">
+                      <div class="progress-row-top">
+                        <strong>${lesson.label}</strong>
+                        ${renderStatusPill(stats.status)}
+                      </div>
+                      <div class="muted">${lesson.focus}</div>
+                      <div class="progress-bar"><span style="width:${stats.percent}%;"></span></div>
+                      <div class="lesson-meta-row">
+                        <span>${stats.mastered}/${lesson.vocabulary.length} strong</span>
+                        <span>${stats.score || 0}% score</span>
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("")}
+            </div>
           </div>
         </div>
       </section>
     `;
   }
 
+  function renderCurrentSection() {
+    if (state.section === "home") return renderHome();
+    if (state.section === "lessons") return renderLessons();
+    if (state.section === "alphabet") return renderAlphabet();
+    if (state.section === "practice") return renderPractice();
+    return renderProgress();
+  }
+
   function render() {
-    const overall = computeOverallStats();
-    const showHero = state.section === "dashboard" && !state.lessonDetailOpen;
     root.innerHTML = `
       <div class="app-shell">
-        ${
-          showHero
-            ? `
-              <section class="hero">
-                <div class="hero-grid">
-                  <div class="hero-copy">
-                    <div class="eyebrow">Madinah Book 1</div>
-                    <h1>Madinah Lab</h1>
-                    <p>Clean mobile lessons, flashcards, typing, and pronunciation practice.</p>
-                  </div>
-                  <div class="hero-metrics">
-                    <div class="hero-metric">
-                      <strong>${lessons.length}</strong>
-                      <span>Lessons</span>
-                    </div>
-                    <div class="hero-metric">
-                      <strong>${overall.reviewedCards}</strong>
-                      <span>Reviewed</span>
-                    </div>
-                    <div class="hero-metric">
-                      <strong>${overall.streak}</strong>
-                      <span>Streak</span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            `
-            : ""
-        }
         <main class="main-stage">
-          <div class="screen ${state.section === "dashboard" ? "" : "hide"}">${renderDashboard()}</div>
-          <div class="screen ${state.section === "practice" ? "" : "hide"}">${renderPractice()}</div>
-          <div class="screen ${state.section === "progress" ? "" : "hide"}">${renderProgress()}</div>
+          <div class="screen">${renderCurrentSection()}</div>
         </main>
-        <nav class="bottom-nav">
+        <nav class="bottom-nav bottom-nav-wide">
           ${[
-            ["dashboard", "Lessons"],
-            ["practice", "Practice"],
-            ["progress", "Progress"]
+            ["home", "⌂", "Home"],
+            ["lessons", "📘", "Lessons"],
+            ["alphabet", "أ", "Alphabet"],
+            ["practice", "🎙", "Practice"],
+            ["progress", "📈", "Progress"]
           ]
             .map(
-              ([section, label]) => `
+              ([section, glyph, label]) => `
                 <button class="nav-button ${state.section === section ? "is-active" : ""}" data-action="change-section" data-section="${section}">
-                  ${label}
+                  <span class="nav-glyph">${glyph}</span>
+                  <span class="nav-label">${label}</span>
                 </button>
               `
             )
@@ -919,109 +1582,106 @@
 
     if (action === "change-section") {
       state.section = target.dataset.section;
-      if (target.dataset.section !== "dashboard") {
-        state.lessonDetailOpen = false;
-      }
+      state.lessonDetailOpen = false;
+      state.lessonCompleted = false;
+      state.alphabetSelected = null;
     }
 
-    if (action === "pick-lesson") {
-      state.lessonId = target.dataset.lessonId;
-      resetFlashcards();
-      resetMatchRound();
-      resetTyping();
-      resetPronunciation();
-    }
+    if (action === "set-lesson-category") state.lessonFilterCategory = target.dataset.category;
+    if (action === "set-lesson-level") state.lessonFilterLevel = target.dataset.level;
 
     if (action === "open-lesson") {
-      state.lessonId = target.dataset.lessonId;
-      state.section = "dashboard";
-      state.lessonDetailOpen = true;
-      state.lessonSlideIndex = 0;
+      resetLessonFlow(target.dataset.lessonId);
+      state.section = "lessons";
+      state.practiceLessonId = target.dataset.lessonId;
     }
 
     if (action === "close-lesson-detail") {
       state.lessonDetailOpen = false;
-      state.lessonSlideIndex = 0;
+      state.lessonContentIndex = 0;
+      state.lessonAnswers = {};
+      state.lessonCompleted = false;
     }
 
-    if (action === "lesson-detail-next") {
-      const slides = getLessonSlides(getLesson());
-      state.lessonSlideIndex = Math.min(state.lessonSlideIndex + 1, slides.length - 1);
+    if (action === "lesson-prev") state.lessonContentIndex = Math.max(0, state.lessonContentIndex - 1);
+    if (action === "lesson-next") state.lessonContentIndex = Math.min(getLesson().content.length - 1, state.lessonContentIndex + 1);
+    if (action === "answer-lesson-quiz") state.lessonAnswers[state.lessonContentIndex] = target.dataset.option;
+    if (action === "complete-lesson") completeLesson();
+    if (action === "quiz-prev") state.quizIndex = Math.max(0, state.quizIndex - 1);
+    if (action === "quiz-next") state.quizIndex = Math.min(state.quizRound.length - 1, state.quizIndex + 1);
+    if (action === "answer-practice-quiz") {
+      const item = currentQuizItem();
+      if (!item || state.quizAnswers[state.quizIndex]) {
+        render();
+        return;
+      }
+      state.quizAnswers[state.quizIndex] = target.dataset.option;
+      trackAnswer(getPracticeLesson().id, item.entry, target.dataset.option === item.correct_answer ? "known" : "unknown");
+    }
+    if (action === "quiz-complete") completeQuizRound();
+    if (action === "restart-quiz-round") resetQuizRound();
+    if (action === "set-quiz-direction") {
+      state.quizDirection = target.dataset.direction;
+      resetQuizRound();
+    }
+    if (action === "toggle-quiz-direction") {
+      state.quizDirection = state.quizDirection === "en-to-ar" ? "ar-to-en" : "en-to-ar";
+      resetQuizRound();
     }
 
-    if (action === "lesson-detail-prev") {
-      state.lessonSlideIndex = Math.max(state.lessonSlideIndex - 1, 0);
+    if (action === "open-alphabet-letter") {
+      state.alphabetSelected = ARABIC_ALPHABET.find((item) => item.letter === target.dataset.letter) || null;
+      if (state.alphabetSelected) speakArabic(state.alphabetSelected.letter);
+    }
+    if (action === "close-alphabet-letter") state.alphabetSelected = null;
+
+    if (action === "change-practice-lesson") {
+      const currentMode = state.practiceMode;
+      resetPracticeSelection(target.dataset.lessonId);
+      state.lessonId = target.dataset.lessonId;
+      if (currentMode) setPracticeMode(currentMode);
     }
 
-    if (action === "start-practice-from-detail") {
-      state.lessonDetailOpen = false;
+    if (action === "start-practice") {
       state.section = "practice";
-      state.mode = "flashcards";
-      resetFlashcards();
-      resetMatchRound();
-      resetTyping();
-      resetPronunciation();
+      resetPracticeSelection(target.dataset.lessonId || state.practiceLessonId);
+      if (target.dataset.mode) setPracticeMode(target.dataset.mode);
     }
 
-    if (action === "start-mode") {
-      state.section = "practice";
-      state.mode = target.dataset.mode;
-      if (state.mode === "matching") resetMatchRound();
-    }
-
-    if (action === "change-mode") {
-      state.mode = target.dataset.mode;
-      if (state.mode === "matching") resetMatchRound();
-    }
-
+    if (action === "back-practice-modes") state.practiceMode = null;
+    if (action === "select-practice-mode") setPracticeMode(target.dataset.mode);
     if (action === "set-flash-direction") {
       state.flashDirection = target.dataset.direction;
       resetFlashcards();
     }
-
     if (action === "toggle-flash-shuffle") {
       state.flashShuffle = !state.flashShuffle;
       resetFlashcards();
     }
+    if (action === "toggle-flash-answer") state.flashRevealed = !state.flashRevealed;
+    if (action === "grade-flashcard") advanceFlashcard(target.dataset.result);
+    if (action === "practice-flash-missed") resetFlashcards(state.flashUnknown.length ? state.flashUnknown.map((item) => item.entry) : flashSourceEntries());
+    if (action === "restart-flash-round") resetFlashcards();
 
-    if (action === "toggle-flash-answer") {
-      state.flashRevealed = !state.flashRevealed;
-    }
-
-    if (action === "grade-flashcard") {
-      advanceFlashcard(target.dataset.result);
-    }
-
-    if (action === "reset-matching") {
-      resetMatchRound();
-    }
-
+    if (action === "reset-matching") resetMatchRound();
     if (action === "pick-match") {
-      const id = target.dataset.cardId;
-      if (state.matchSolved.includes(id)) {
-        render();
-        return;
-      }
-      if (state.matchSelection.includes(id)) {
-        state.matchSelection = state.matchSelection.filter((entry) => entry !== id);
-      } else {
-        state.matchSelection = [...state.matchSelection, id].slice(-2);
-      }
-      if (state.matchSelection.length === 2) {
-        const [first, second] = state.matchSelection.map((selectionId) =>
-          state.matchRound.find((item) => item.id === selectionId)
-        );
-        if (first && second && first.pairId === second.pairId && first.side !== second.side) {
-          state.matchSolved.push(first.id, second.id);
-          state.matchFeedback = "Nice match. Pair locked in.";
-          trackAnswer(getLesson().id, { arabic: first.side === "arabic" ? first.label : second.label }, "known");
-        } else {
-          state.matchFeedback = "Not quite. Try another pair.";
+      const cardIdValue = target.dataset.cardId;
+      if (!state.matchSolved.includes(cardIdValue)) {
+        state.matchSelection = state.matchSelection.concat(cardIdValue).slice(-2);
+        if (state.matchSelection.length === 2) {
+          const [first, second] = state.matchSelection.map((id) => state.matchRound.find((item) => item.id === id));
+          if (first && second && first.side !== second.side && first.pairId === second.pairId) {
+            state.matchSolved = state.matchSolved.concat(state.matchSelection);
+            state.matchFeedback = "Nice pair. Keep going.";
+            trackAnswer(getPracticeLesson().id, getPracticeLesson().vocabulary[first.pairId], "known");
+          } else {
+            state.matchFeedback = "Not quite. Try another pair.";
+          }
+          setTimeout(() => {
+            state.matchSelection = [];
+            render();
+          }, 450);
         }
-        setTimeout(() => {
-          state.matchSelection = [];
-          render();
-        }, 420);
       }
     }
 
@@ -1029,42 +1689,23 @@
       state.typingDirection = target.dataset.direction;
       resetTyping();
     }
-
-    if (action === "toggle-typing-strict") {
-      state.typingStrict = !state.typingStrict;
-    }
-
-    if (action === "insert-char") {
-      state.typingInput += target.dataset.char;
-    }
-
+    if (action === "toggle-typing-strict") state.typingStrict = !state.typingStrict;
+    if (action === "insert-char") state.typingInput += target.dataset.char;
     if (action === "submit-typing") {
-      const lesson = getLesson();
+      const lesson = getPracticeLesson();
       const card = getTypingCard();
       const targetLanguage = state.typingDirection === "en-to-ar" ? "arabic" : "english";
       const expected = targetLanguage === "arabic" ? card.arabic : card.english;
       const correct = compareAnswer(expected, state.typingInput, state.typingStrict, targetLanguage);
       trackAnswer(lesson.id, card, correct ? "known" : "unknown");
-      state.typingFeedback = {
-        correct,
-        expected,
-        message: correct ? "Correct. Move on to the next prompt when you are ready." : "Close, but not quite."
-      };
+      state.typingFeedback = { correct, expected, message: correct ? "Correct. Move on when you are ready." : "Close, but not quite." };
     }
-
     if (action === "reveal-typing") {
       const card = getTypingCard();
       const expected = state.typingDirection === "en-to-ar" ? card.arabic : card.english;
-      state.typingFeedback = {
-        correct: false,
-        expected,
-        message: "Answer revealed. Try typing it once before moving on."
-      };
+      state.typingFeedback = { correct: false, expected, message: "Answer revealed. Type it once before moving on." };
     }
-
-    if (action === "next-typing") {
-      nextTypingCard();
-    }
+    if (action === "next-typing") nextTypingCard();
 
     if (action === "toggle-listening") {
       const engine = getRecognition();
@@ -1072,43 +1713,50 @@
         render();
         return;
       }
-      if (state.pronunciationListening) {
-        engine.stop();
-      } else {
-        state.pronunciationFeedback = null;
+      if (state.pronunciationListening) engine.stop();
+      else {
         state.pronunciationTranscript = "";
+        state.pronunciationFeedback = null;
         engine.start();
       }
     }
-
-    if (action === "next-pronunciation") {
-      nextPronunciationPrompt();
-    }
+    if (action === "next-pronunciation") nextPronunciationPrompt();
 
     if (action === "speak-current") {
-      if (state.mode === "typing") {
-        speakArabic(getTypingCard().arabic);
-      } else if (state.mode === "pronunciation") {
-        speakArabic(pronunciationPool()[state.pronunciationIndex].arabic);
-      } else {
-        speakArabic(currentFlashCard().entry.arabic);
+      if (state.section === "practice") {
+        if (state.practiceMode === "quiz") {
+          const item = currentQuizItem();
+          speakArabic(item?.entry?.arabic || "");
+        }
+        else if (state.practiceMode === "pronunciation") speakArabic(pronunciationPool()[state.pronunciationIndex]?.arabic || "");
+        else if (state.practiceMode === "typing") speakArabic(getTypingCard()?.arabic || "");
+        else speakArabic(currentFlashCard()?.entry?.arabic || getPracticeLesson().phrases[0]?.arabic || "");
+      }
+      if (state.section === "lessons" && state.lessonDetailOpen && !state.lessonCompleted) {
+        const item = getLesson().content[state.lessonContentIndex];
+        speakArabic(item?.arabic || "");
       }
     }
 
+    if (action === "speak-text") speakArabic(target.dataset.text);
     render();
   }
 
   function onInput(event) {
     const target = event.target;
-    if (target.dataset.action === "typing-input") {
+    if (target.dataset.input === "lesson-search") {
+      state.lessonSearch = target.value;
+      render();
+    }
+    if (target.dataset.input === "typing-input") {
       state.typingInput = target.value;
+      render();
     }
   }
 
   root.addEventListener("click", onClick);
   root.addEventListener("input", onInput);
 
-  resetFlashcards();
-  resetMatchRound();
+  resetPracticeSelection(state.practiceLessonId);
   render();
 })();
