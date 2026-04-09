@@ -8,6 +8,8 @@
     section: "dashboard",
     mode: "flashcards",
     lessonId: lessons[0]?.id || "",
+    lessonDetailOpen: false,
+    lessonSlideIndex: 0,
     flashDirection: "mixed",
     flashShuffle: true,
     flashDeck: [],
@@ -179,6 +181,18 @@
     return state.flashDeck[state.flashIndex] || state.flashDeck[0];
   }
 
+  function flashRoundTotal() {
+    return getLesson().vocabulary.length || 1;
+  }
+
+  function flashSolvedCount() {
+    return Math.max(0, flashRoundTotal() - state.flashDeck.length);
+  }
+
+  function flashCardPosition() {
+    return Math.min(flashRoundTotal(), flashSolvedCount() + (state.flashDeck.length ? 1 : 0));
+  }
+
   function resetFlashcards() {
     const lesson = getLesson();
     const deck = lesson.vocabulary.map((entry, index) => ({
@@ -198,13 +212,23 @@
     const lesson = getLesson();
     const card = currentFlashCard();
     if (result) trackAnswer(lesson.id, card.entry, result);
-    const nextIndex = state.flashIndex + 1;
-    if (nextIndex >= state.flashDeck.length) {
-      resetFlashcards();
-    } else {
-      state.flashIndex = nextIndex;
-      state.flashRevealed = false;
+
+    const queue = state.flashDeck.slice();
+    const currentIndex = Math.min(state.flashIndex, Math.max(queue.length - 1, 0));
+    const [currentCard] = queue.splice(currentIndex, 1);
+
+    if (result === "unknown" && currentCard) {
+      queue.push(currentCard);
     }
+
+    if (!queue.length) {
+      resetFlashcards();
+      return;
+    }
+
+    state.flashDeck = queue;
+    state.flashIndex = currentIndex >= queue.length ? 0 : currentIndex;
+    state.flashRevealed = false;
   }
 
   function resetMatchRound() {
@@ -326,6 +350,37 @@
     return getLesson().vocabulary[state.typingIndex % getLesson().vocabulary.length];
   }
 
+  function getLessonSlides(lesson) {
+    const phraseOne = lesson.phrases[0];
+    const phraseTwo = lesson.phrases[1];
+    const vocabPreview = lesson.vocabulary.slice(0, 4);
+    return [
+      {
+        kind: "note",
+        label: "Grammar Note",
+        title: lesson.label,
+        body: `${lesson.focus}. ${phraseOne ? phraseOne.english : "Start this lesson by noticing the core pattern and repeating it aloud."}`,
+        footer: phraseOne ? phraseOne.arabic : lesson.focus
+      },
+      {
+        kind: "phrase",
+        label: "Key Phrase",
+        title: phraseOne ? phraseOne.english : "Core phrase",
+        arabic: phraseOne ? phraseOne.arabic : lesson.vocabulary[0]?.arabic || "",
+        body: phraseTwo ? phraseTwo.english : "Read the Arabic, then say it out loud before moving on.",
+        footer: phraseTwo ? phraseTwo.arabic : lesson.sourcePage
+      },
+      {
+        kind: "vocab",
+        label: "Vocabulary",
+        title: `${lesson.vocabulary.length} words in this lesson`,
+        vocab: vocabPreview,
+        body: "Preview the lesson vocabulary, then open practice to drill it with flashcards, matching, typing, and pronunciation.",
+        footer: lesson.sourcePage
+      }
+    ];
+  }
+
   function escapeHtml(value) {
     return String(value)
       .replace(/&/g, "&amp;")
@@ -335,78 +390,140 @@
   }
 
   function renderDashboard() {
-    const lesson = getLesson();
+    if (state.lessonDetailOpen) {
+      return renderLessonDetail();
+    }
     const overall = computeOverallStats();
+    const categories = ["All", "Madinah Book", "Vocabulary", "Typing", "Pronunciation"];
+    const levels = ["All levels", "Beginner", "Core vocab", "Review"];
     return `
-      <section class="panel dashboard-stack">
-        <div>
-          <div class="panel-head">
-            <div>
-              <h2>Study Dashboard</h2>
-              <p>Built around Madinah Book 1 first, with session-only stats so it stays simple to host on GitHub Pages.</p>
-            </div>
-          </div>
-          <div class="lesson-strip">
-            ${lessons
-              .map(
-                (entry) => `
-                  <button class="lesson-chip ${entry.id === lesson.id ? "is-active" : ""}" data-action="pick-lesson" data-lesson-id="${entry.id}">
-                    <strong>${entry.label}</strong>
-                    <span>${entry.focus}</span>
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-          <div class="dashboard-focus">
-            <div class="focus-card">
-              <div class="eyebrow">Current Focus</div>
-              <h3>${lesson.label}</h3>
-              <p>${lesson.focus}</p>
-              <p class="muted" style="margin-top:10px;">Source: ${lesson.sourcePage}. Session storage keeps progress alive until the tab or browser session is cleared.</p>
-              <div class="focus-actions">
-                ${[
-                  ["flashcards", "Flashcards", "Start fast recall with red / check / green controls."],
-                  ["matching", "Matching Game", "Connect Arabic and English pairs from the current lesson."],
-                  ["typing", "Typing Drill", "Practice Arabic spelling with optional strict haraqat."],
-                  ["pronunciation", "Pronunciation", "Use browser speech recognition for live feedback."]
-                ]
-                  .map(
-                    ([mode, label, note]) => `
-                      <button class="action-link" data-action="start-mode" data-mode="${mode}">
-                        <span>
-                          <strong>${label}</strong>
-                          <small>${note}</small>
-                        </span>
-                        <span>Open</span>
-                      </button>
-                    `
-                  )
-                  .join("")}
-              </div>
-            </div>
+      <section class="panel lessons-screen">
+        <div class="screen-head">
+          <div>
+            <h2>Lessons</h2>
+            <p>Madinah Book 1 first, with session progress only.</p>
           </div>
         </div>
-        <div>
-          <div class="summary-grid" style="padding:0 22px 22px;">
-            <div class="summary-card">
-              <strong>${overall.reviewedCards}</strong>
-              <span>Cards touched this session</span>
-            </div>
-            <div class="summary-card">
-              <strong>${overall.masteredCards}</strong>
-              <span>Cards looking strong</span>
-            </div>
-            <div class="summary-card">
-              <strong>${overall.streak}</strong>
-              <span>Consecutive study days in this session log</span>
-            </div>
+        <div class="lesson-strip category-strip">
+          ${categories
+            .map(
+              (entry, index) => `
+                <button class="lesson-chip ${index === 0 ? "is-active" : ""}">
+                  <strong>${entry}</strong>
+                </button>
+              `
+            )
+            .join("")}
+        </div>
+        <div class="strip-scrollbar" aria-hidden="true"><span></span></div>
+        <div class="mode-row level-strip">
+          ${levels
+            .map(
+              (entry, index) => `
+                <button class="mode-chip ${index === 0 ? "is-active" : ""}">
+                  <strong>${entry}</strong>
+                </button>
+              `
+            )
+            .join("")}
+        </div>
+        <div class="lesson-list">
+          ${lessons
+            .map((lesson) => {
+              const stats = computeLessonStats(lesson);
+              const subtitle = lesson.phrases[0]?.arabic || lesson.vocabulary[0]?.arabic || "";
+              return `
+                <button class="lesson-list-card" data-action="open-lesson" data-lesson-id="${lesson.id}">
+                  <div class="lesson-list-icon lesson-index">${lesson.sequence}</div>
+                  <div class="lesson-list-body">
+                    <div class="lesson-badge">Beginner</div>
+                    <h3>${lesson.label} - ${lesson.focus}</h3>
+                    <div class="lesson-arabic arabic-text">${subtitle}</div>
+                    <p>${lesson.vocabulary.length} vocabulary cards with flashcards, matching, typing, and pronunciation practice.</p>
+                    <div class="lesson-meta-row">
+                      <span>10 min</span>
+                      <span>${Math.max(25, lesson.vocabulary.length * 5)} XP</span>
+                      <span>${stats.percent}%</span>
+                    </div>
+                  </div>
+                  <div class="lesson-chevron">&rsaquo;</div>
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+        <div class="home-summary">
+          <div class="summary-card">
+            <strong>${overall.reviewedCards}</strong>
+            <span>Cards touched</span>
           </div>
-          <div class="up-next">
-            <div class="locked-card">
-              <strong>Later module: Qur'anic high-frequency words</strong>
-              <p class="muted" style="margin-top:8px;">The structure is ready for it, but the current build keeps the priority on Fusha plus Madinah Book 1 lesson vocabulary.</p>
-            </div>
+          <div class="summary-card">
+            <strong>${overall.masteredCards}</strong>
+            <span>Strong cards</span>
+          </div>
+          <div class="summary-card">
+            <strong>${overall.streak}</strong>
+            <span>Study streak</span>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function renderLessonDetail() {
+    const lesson = getLesson();
+    const slides = getLessonSlides(lesson);
+    const currentSlide = slides[state.lessonSlideIndex] || slides[0];
+    const progress = ((state.lessonSlideIndex + 1) / slides.length) * 100;
+    return `
+      <section class="panel lesson-detail-screen">
+        <div class="practice-screen-head">
+          <button class="back-button" data-action="close-lesson-detail">&larr;</button>
+          <div class="practice-title-wrap">
+            <h2>${lesson.label} - ${lesson.focus}</h2>
+            <p>${state.lessonSlideIndex + 1} of ${slides.length}</p>
+          </div>
+        </div>
+        <div class="practice-progress"><span style="width:${progress}%;"></span></div>
+        <div class="lesson-detail-body">
+          <article class="lesson-detail-card">
+            <div class="lesson-detail-label">${currentSlide.label}</div>
+            <h3>${currentSlide.title}</h3>
+            ${currentSlide.arabic ? `<div class="lesson-detail-arabic arabic-text">${currentSlide.arabic}</div>` : ""}
+            ${
+              currentSlide.vocab
+                ? `
+                  <div class="lesson-detail-vocab-grid">
+                    ${currentSlide.vocab
+                      .map(
+                        (entry) => `
+                          <div class="lesson-detail-vocab-row">
+                            <strong class="arabic-text">${entry.arabic}</strong>
+                            <span>${entry.english}</span>
+                          </div>
+                        `
+                      )
+                      .join("")}
+                  </div>
+                `
+                : ""
+            }
+            <p>${currentSlide.body}</p>
+            <div class="lesson-detail-footer ${currentSlide.arabic || currentSlide.footer?.match(/[ء-ي]/) ? "arabic-text" : ""}">${currentSlide.footer || ""}</div>
+          </article>
+          <div class="lesson-detail-actions">
+            <button
+              class="lesson-nav-button ${state.lessonSlideIndex === 0 ? "is-disabled" : ""}"
+              data-action="lesson-detail-prev"
+              ${state.lessonSlideIndex === 0 ? "disabled" : ""}
+            >
+              &larr; Previous
+            </button>
+            ${
+              state.lessonSlideIndex === slides.length - 1
+                ? `<button class="lesson-nav-button is-primary" data-action="start-practice-from-detail">Practice &rarr;</button>`
+                : `<button class="lesson-nav-button is-primary" data-action="lesson-detail-next">Next &rarr;</button>`
+            }
           </div>
         </div>
       </section>
@@ -424,8 +541,8 @@
         <div class="toolbar-row">
           <div class="segmented">
             ${[
-              ["en-to-ar", "EN → AR"],
-              ["ar-to-en", "AR → EN"],
+                ["en-to-ar", "EN to AR"],
+                ["ar-to-en", "AR to EN"],
               ["mixed", "Mixed"]
             ]
               .map(
@@ -444,7 +561,7 @@
       <div class="flashcard">
         <div class="flashcard-top">
           <div class="flashcard-tag">${lesson.label}</div>
-          <div class="flashcard-tag">${state.flashIndex + 1} / ${state.flashDeck.length}</div>
+          <div class="flashcard-tag">${flashCardPosition()} / ${flashRoundTotal()}</div>
         </div>
         <div class="flashcard-main">
           <div class="subcopy">${card.direction === "en-to-ar" ? "English to Arabic" : "Arabic to English"}</div>
@@ -641,15 +758,20 @@
   function renderPractice() {
     const lesson = getLesson();
     const lessonStats = computeLessonStats(lesson);
+    const progressValue =
+      state.mode === "flashcards"
+        ? Math.round((flashSolvedCount() / flashRoundTotal()) * 100)
+        : Math.max(8, lessonStats.percent);
     return `
-      <section class="panel workspace">
-        <div class="panel-head">
-          <div>
-            <h2>Practice Studio</h2>
-            <p>One lesson at a time, mobile first, with multiple ways to lock the vocabulary in.</p>
+      <section class="panel practice-screen">
+        <div class="practice-screen-head">
+          <button class="back-button" data-action="change-section" data-section="dashboard">&larr;</button>
+          <div class="practice-title-wrap">
+            <h2>${lesson.label} - ${lesson.focus}</h2>
+            <p>${flashCardPosition()} of ${lesson.vocabulary.length}</p>
           </div>
-          <div class="eyebrow">Mastery ${lessonStats.percent}%</div>
         </div>
+        <div class="practice-progress"><span style="width:${progressValue}%;"></span></div>
         <div class="practice-layout">
           <div class="lesson-strip" style="padding:0 0 16px;">
             ${lessons
@@ -662,11 +784,6 @@
                 `
               )
               .join("")}
-          </div>
-          <div class="lesson-meta">
-            <h3>${lesson.label}</h3>
-            <p>${lesson.focus}</p>
-            <p class="practice-note">Starter vocabulary was transcribed from your provided Madinah Book 1 English key pages. The structure is ready for more lesson imports next.</p>
           </div>
           <div class="mode-row">
             ${[
@@ -695,40 +812,43 @@
     const overall = computeOverallStats();
     return `
       <section class="panel progress-board">
-        <div class="panel-head">
-          <div>
+        <div class="practice-screen-head">
+          <button class="back-button" data-action="change-section" data-section="dashboard">&larr;</button>
+          <div class="practice-title-wrap">
             <h2>Session Progress</h2>
-            <p>Because you’re hosting on GitHub Pages, this build stores progress only for the current browser session.</p>
+            <p>Because you are hosting on GitHub Pages, this build stores progress only for the current browser session.</p>
           </div>
         </div>
-        <div class="summary-grid" style="padding:0 22px 22px;">
-          <div class="summary-card">
-            <strong>${overall.sessionAnswers}</strong>
-            <span>Total answers this session</span>
+        <div class="progress-content">
+          <div class="summary-grid" style="padding:0 22px 22px;">
+            <div class="summary-card">
+              <strong>${overall.sessionAnswers}</strong>
+              <span>Total answers this session</span>
+            </div>
+            <div class="summary-card">
+              <strong>${overall.reviewedCards}</strong>
+              <span>Vocabulary items seen</span>
+            </div>
+            <div class="summary-card">
+              <strong>${overall.masteredCards}</strong>
+              <span>Items currently trending strong</span>
+            </div>
           </div>
-          <div class="summary-card">
-            <strong>${overall.reviewedCards}</strong>
-            <span>Vocabulary items seen</span>
+          <div class="summary-grid" style="padding:0 22px 22px;">
+            ${lessons
+              .map((lesson) => {
+                const stats = computeLessonStats(lesson);
+                return `
+                  <div class="progress-row">
+                    <strong>${lesson.label}</strong>
+                    <span class="muted">${lesson.focus}</span>
+                    <div class="progress-bar" style="margin-top:12px;"><span style="width:${stats.percent}%;"></span></div>
+                    <div class="muted" style="margin-top:10px;">${stats.mastered} / ${lesson.vocabulary.length} cards feeling solid this session</div>
+                  </div>
+                `;
+              })
+              .join("")}
           </div>
-          <div class="summary-card">
-            <strong>${overall.masteredCards}</strong>
-            <span>Items currently trending strong</span>
-          </div>
-        </div>
-        <div class="summary-grid" style="padding:0 22px 22px;">
-          ${lessons
-            .map((lesson) => {
-              const stats = computeLessonStats(lesson);
-              return `
-                <div class="progress-row">
-                  <strong>${lesson.label}</strong>
-                  <span class="muted">${lesson.focus}</span>
-                  <div class="progress-bar" style="margin-top:12px;"><span style="width:${stats.percent}%;"></span></div>
-                  <div class="muted" style="margin-top:10px;">${stats.mastered} / ${lesson.vocabulary.length} cards feeling solid this session</div>
-                </div>
-              `;
-            })
-            .join("")}
         </div>
       </section>
     `;
@@ -736,45 +856,46 @@
 
   function render() {
     const overall = computeOverallStats();
+    const showHero = state.section === "dashboard" && !state.lessonDetailOpen;
     root.innerHTML = `
       <div class="app-shell">
-        <section class="hero">
-          <div class="hero-grid">
-            <div>
-              <div class="eyebrow">Madinah Book 1 First</div>
-              <h1>Madinah Lab</h1>
-              <p>A mobile-first Arabic web app for Fusha practice, early Madinah Book 1 vocabulary, flashcard review, matching games, Arabic typing, and live pronunciation checks.</p>
-              <div class="stat-grid">
-                <div class="stat-card">
-                  <strong>${lessons.length}</strong>
-                  <span>starter lessons seeded</span>
+        ${
+          showHero
+            ? `
+              <section class="hero">
+                <div class="hero-grid">
+                  <div class="hero-copy">
+                    <div class="eyebrow">Madinah Book 1</div>
+                    <h1>Madinah Lab</h1>
+                    <p>Clean mobile lessons, flashcards, typing, and pronunciation practice.</p>
+                  </div>
+                  <div class="hero-metrics">
+                    <div class="hero-metric">
+                      <strong>${lessons.length}</strong>
+                      <span>Lessons</span>
+                    </div>
+                    <div class="hero-metric">
+                      <strong>${overall.reviewedCards}</strong>
+                      <span>Reviewed</span>
+                    </div>
+                    <div class="hero-metric">
+                      <strong>${overall.streak}</strong>
+                      <span>Streak</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="stat-card">
-                  <strong>${lessons.reduce((total, lesson) => total + lesson.vocabulary.length, 0)}</strong>
-                  <span>starter vocab items</span>
-                </div>
-                <div class="stat-card">
-                  <strong>${overall.reviewedCards}</strong>
-                  <span>cards touched this session</span>
-                </div>
-                <div class="stat-card">
-                  <strong>${overall.streak}</strong>
-                  <span>session streak days</span>
-                </div>
-              </div>
-            </div>
-            <div class="hero-callout">
-              <strong>Designed for phone-first study</strong>
-              <p>Large Arabic type, thumb-friendly controls, haraqat support in typing mode, and no backend requirement so it can ship cleanly on GitHub Pages.</p>
-            </div>
-          </div>
-        </section>
-        <div class="${state.section === "dashboard" ? "" : "hide"}">${renderDashboard()}</div>
-        <div class="${state.section === "practice" ? "" : "hide"}">${renderPractice()}</div>
-        <div class="${state.section === "progress" ? "" : "hide"}">${renderProgress()}</div>
+              </section>
+            `
+            : ""
+        }
+        <main class="main-stage">
+          <div class="screen ${state.section === "dashboard" ? "" : "hide"}">${renderDashboard()}</div>
+          <div class="screen ${state.section === "practice" ? "" : "hide"}">${renderPractice()}</div>
+          <div class="screen ${state.section === "progress" ? "" : "hide"}">${renderProgress()}</div>
+        </main>
         <nav class="bottom-nav">
           ${[
-            ["dashboard", "Dashboard"],
+            ["dashboard", "Lessons"],
             ["practice", "Practice"],
             ["progress", "Progress"]
           ]
@@ -798,10 +919,44 @@
 
     if (action === "change-section") {
       state.section = target.dataset.section;
+      if (target.dataset.section !== "dashboard") {
+        state.lessonDetailOpen = false;
+      }
     }
 
     if (action === "pick-lesson") {
       state.lessonId = target.dataset.lessonId;
+      resetFlashcards();
+      resetMatchRound();
+      resetTyping();
+      resetPronunciation();
+    }
+
+    if (action === "open-lesson") {
+      state.lessonId = target.dataset.lessonId;
+      state.section = "dashboard";
+      state.lessonDetailOpen = true;
+      state.lessonSlideIndex = 0;
+    }
+
+    if (action === "close-lesson-detail") {
+      state.lessonDetailOpen = false;
+      state.lessonSlideIndex = 0;
+    }
+
+    if (action === "lesson-detail-next") {
+      const slides = getLessonSlides(getLesson());
+      state.lessonSlideIndex = Math.min(state.lessonSlideIndex + 1, slides.length - 1);
+    }
+
+    if (action === "lesson-detail-prev") {
+      state.lessonSlideIndex = Math.max(state.lessonSlideIndex - 1, 0);
+    }
+
+    if (action === "start-practice-from-detail") {
+      state.lessonDetailOpen = false;
+      state.section = "practice";
+      state.mode = "flashcards";
       resetFlashcards();
       resetMatchRound();
       resetTyping();
@@ -893,7 +1048,7 @@
       state.typingFeedback = {
         correct,
         expected,
-        message: correct ? "Correct. Move on to the next prompt when you’re ready." : "Close, but not quite."
+        message: correct ? "Correct. Move on to the next prompt when you are ready." : "Close, but not quite."
       };
     }
 
