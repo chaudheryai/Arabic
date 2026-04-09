@@ -1205,6 +1205,280 @@ body {
   padding: 0 18px 18px;
 }
 
+.quran-layout {
+  display: grid;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 18px 18px;
+}
+
+.quran-layout.is-chooser {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+
+.quran-layout.is-active-session {
+  grid-template-rows: minmax(0, 1fr);
+  padding-top: 0;
+}
+
+.quran-body {
+  display: grid;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.quran-overview,
+.quran-session-card,
+.chapter-practice-card {
+  min-height: 0;
+  overflow: auto;
+}
+
+.quran-overview {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding-bottom: 2px;
+}
+
+.quran-intro-card {
+  padding: 16px 18px;
+  border: 1px solid #e7e3da;
+  border-radius: 22px;
+  background: #f8f7f4;
+  color: #18232c;
+}
+
+.quran-intro-card strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.quran-intro-card p {
+  margin: 6px 0 0;
+  color: #738492;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.quran-chapter-list {
+  display: grid;
+  gap: 12px;
+}
+
+.quran-chapter-card {
+  border: 1px solid #e7e3da;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(28, 39, 49, 0.06);
+  overflow: hidden;
+}
+
+.quran-chapter-card.is-active {
+  border-color: #cfe7e2;
+  box-shadow: 0 10px 24px rgba(22, 139, 124, 0.12);
+}
+
+.quran-chapter-select {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: transparent;
+  color: #18232c;
+  text-align: left;
+}
+
+.quran-chapter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.quran-chapter-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #18232c;
+}
+
+.quran-chapter-progress {
+  min-width: 62px;
+  display: grid;
+  justify-items: end;
+  align-content: start;
+}
+
+.quran-chapter-progress strong {
+  color: #1d9b8a;
+  font-size: 1rem;
+}
+
+.quran-chapter-progress span {
+  color: #7a8892;
+  font-size: 0.72rem;
+}
+
+.quran-chapter-select p {
+  margin: 0;
+  color: #738492;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.quran-chapter-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.quran-mode-button {
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid #deece8;
+  border-radius: 18px;
+  background: #eef7f5;
+  color: #17353b;
+  text-align: left;
+}
+
+.quran-mode-button strong,
+.quran-mode-button small {
+  display: block;
+}
+
+.quran-mode-button strong {
+  font-size: 0.88rem;
+}
+
+.quran-mode-button small {
+  margin-top: 2px;
+  color: #5f747d;
+  font-size: 0.72rem;
+}
+
+.quran-mode-icon {
+  font-size: 1.1rem;
+}
+
+.quran-surah-summary {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e7e3da;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(28, 39, 49, 0.06);
+}
+
+.quran-mode-list {
+  align-content: start;
+}
+
+.quran-surah-strip {
+  padding-top: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.quran-surah-chip {
+  min-width: 154px;
+}
+
+.quran-session-wrap {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 0;
+}
+
+.quran-review-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.quran-review-actions .lesson-nav-button {
+  padding: 10px 8px;
+  font-size: 0.84rem;
+}
+
+.quran-surah-kicker {
+  text-align: center;
+  color: #6f7f89;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.quran-ayah-text {
+  font-size: clamp(1.9rem, 8.8vw, 3.25rem);
+  line-height: 1.65;
+}
+
+.quran-meaning,
+.quran-memory-prompt {
+  text-align: center;
+}
+
+.quran-meaning {
+  color: #1f2b33;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.quran-memory-prompt {
+  margin-top: 6px;
+}
+
+.quran-order-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.order-ayah-card {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #e1ddd4;
+  border-radius: 16px;
+  background: #f8f7f4;
+  color: #18232c;
+  text-align: right;
+}
+
+.order-ayah-card strong {
+  color: #1d9b8a;
+  text-align: left;
+}
+
+.order-ayah-card.is-picked,
+.order-ayah-card:disabled {
+  opacity: 0.45;
+}
+
+.quran-picked-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quran-picked-pill {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #eef7f5;
+  color: #17353b;
+}
+
+.quran-picked-pill strong {
+  color: #1d9b8a;
+}
+
 .lesson-detail-screen {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -1411,17 +1685,23 @@ body {
   background: rgba(29, 155, 138, 0.08);
 }
 
-.practice-screen {
+.practice-screen,
+.quran-screen {
   overflow: hidden;
 }
 
 .practice-screen .lesson-strip,
-.practice-screen .mode-row {
+.practice-screen .mode-row,
+.quran-screen .lesson-strip {
   padding-left: 0;
   padding-right: 0;
 }
 
 .practice-screen .lesson-strip {
+  padding-bottom: 8px;
+}
+
+.quran-screen .lesson-strip {
   padding-bottom: 8px;
 }
 
@@ -1645,6 +1925,7 @@ body {
 .lessons-screen,
 .alphabet-screen,
 .practice-screen,
+.quran-screen,
 .progress-board {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -2177,6 +2458,39 @@ body {
   .quick-action-card,
   .practice-mode-card {
     padding: 14px;
+  }
+
+  .quran-layout {
+    padding: 0 16px 14px;
+  }
+
+  .quran-layout.is-chooser {
+    gap: 8px;
+  }
+
+  .quran-surah-summary,
+  .quran-session-card,
+  .chapter-practice-card {
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .quran-chapter-select {
+    padding: 16px;
+  }
+
+  .quran-chapter-modes {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px;
+  }
+
+  .quran-ayah-text {
+    font-size: clamp(1.8rem, 8vw, 2.7rem);
+  }
+
+  .quran-review-actions .lesson-nav-button {
+    padding: 10px 6px;
+    font-size: 0.76rem;
   }
 
   .nav-label {

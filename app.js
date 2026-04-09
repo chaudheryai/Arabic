@@ -1,5 +1,6 @@
 (function () {
   const rawLessons = (window.APP_LESSONS || []).slice().sort((a, b) => a.sequence - b.sequence);
+  const rawQuranSurahs = (window.APP_JUZ_AMMA || []).slice().sort((a, b) => a.priority - b.priority);
   const storageKey = "madinah-lab-session-v2";
   const root = document.getElementById("app");
   let recognition = null;
@@ -7,7 +8,6 @@
   const CATEGORY_OPTIONS = [
     { key: "all", label: "الكل" },
     { key: "madina_book1", label: "كتاب المدينة" },
-    { key: "alphabet", label: "الحروف" },
     { key: "greetings", label: "تحيات" },
     { key: "numbers", label: "أرقام" },
     { key: "food", label: "طعام" },
@@ -30,6 +30,13 @@
     { key: "matching", label: "Matching", labelAr: "مطابقة", note: "Pair Arabic with English", icon: "🎯" },
     { key: "typing", label: "Typing", labelAr: "كتابة", note: "Practice spelling and haraqat", icon: "⌨" },
     { key: "pronunciation", label: "Pronunciation", labelAr: "نطق", note: "Listen, speak, and compare", icon: "🎙" }
+  ];
+
+  const QURAN_MODES = [
+    { key: "review", label: "Ayah Cards", labelAr: "بطاقات الآيات", note: "Read, listen, and reveal the Clear Quran meaning.", icon: "📖" },
+    { key: "meaning", label: "Meaning Quiz", labelAr: "اختبار المعنى", note: "Match each ayah with its meaning.", icon: "💡" },
+    { key: "next-ayah", label: "Next Ayah", labelAr: "الآية التالية", note: "Choose the ayah that comes next.", icon: "➡" },
+    { key: "order", label: "Ayah Order", labelAr: "ترتيب الآيات", note: "Tap the ayahs back into order.", icon: "🧩" }
   ];
 
   const ARABIC_ALPHABET = [
@@ -64,6 +71,7 @@
   ];
 
   const lessons = rawLessons.map(normalizeLesson);
+  const juzAmmaSurahs = rawQuranSurahs.map(normalizeSurah);
 
   const state = {
     section: "home",
@@ -77,6 +85,23 @@
     lessonFilterLevel: "all",
     lessonSearch: "",
     alphabetSelected: null,
+    quranSurahId: juzAmmaSurahs[0]?.id || "",
+    quranMode: null,
+    quranAyahIndex: 0,
+    quranRevealMeaning: false,
+    quranMeaningRound: [],
+    quranMeaningIndex: 0,
+    quranMeaningAnswers: {},
+    quranMeaningComplete: false,
+    quranNextRound: [],
+    quranNextIndex: 0,
+    quranNextAnswers: {},
+    quranNextComplete: false,
+    quranOrderDeck: [],
+    quranOrderPicked: [],
+    quranOrderExpected: 1,
+    quranOrderComplete: false,
+    quranOrderFeedback: "",
     practiceMode: null,
     quizDirection: "en-to-ar",
     quizRound: [],
@@ -146,6 +171,37 @@
       phrases,
       vocabulary
     };
+  }
+
+  function normalizeSurah(raw, index) {
+    return {
+      id: raw.id,
+      number: Number(raw.number),
+      priority: Number(raw.priority || raw.number),
+      name: raw.name,
+      name_ar: raw.name_ar || raw.name,
+      translated_name: raw.translated_name || raw.name,
+      revelation_place: raw.revelation_place || "",
+      verses_count: Number(raw.verses_count || (raw.ayahs || []).length),
+      slug: raw.slug || "",
+      focus: `Surah ${raw.name} memory`,
+      summary: `${raw.name_ar} — ${raw.name}. Priority Juz Amma memorization with Quran.com Arabic and The Clear Quran meaning.`,
+      ayahs: (raw.ayahs || []).map((ayah) => ({
+        number: Number(ayah.number),
+        arabic: String(ayah.arabic || "").trim(),
+        meaning: sanitizeQuranMeaning(ayah.meaning || "")
+      })),
+      order: index + 1
+    };
+  }
+
+  function sanitizeQuranMeaning(value) {
+    return String(value || "")
+      .replace(/\d+/g, "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\s+([,.;:!?])/g, "$1")
+      .trim();
   }
 
   function pickLessonIcon(index) {
@@ -345,6 +401,126 @@
     return getLessonById(state.practiceLessonId);
   }
 
+  function getQuranSurahById(surahId) {
+    return juzAmmaSurahs.find((surah) => surah.id === surahId) || juzAmmaSurahs[0];
+  }
+
+  function getQuranSurah() {
+    return getQuranSurahById(state.quranSurahId);
+  }
+
+  function allQuranAyahs() {
+    return juzAmmaSurahs.flatMap((surah) =>
+      surah.ayahs.map((ayah) => ({
+        surah,
+        ayah,
+        key: `${surah.id}:${ayah.number}`
+      }))
+    );
+  }
+
+  function resetQuranMeaningRound() {
+    const surah = getQuranSurah();
+    const meaningPool = allQuranAyahs().map((item) => item.ayah.meaning);
+    state.quranMeaningRound = surah.ayahs.map((ayah) => ({
+      ayah,
+      options: buildChoiceOptions(ayah.meaning, meaningPool.filter((item) => item !== ayah.meaning), 4)
+    }));
+    state.quranMeaningIndex = 0;
+    state.quranMeaningAnswers = {};
+    state.quranMeaningComplete = false;
+  }
+
+  function resetQuranNextRound() {
+    const surah = getQuranSurah();
+    const arabicPool = allQuranAyahs().map((item) => item.ayah.arabic);
+    state.quranNextRound = surah.ayahs.slice(0, -1).map((ayah, index) => ({
+      current: ayah,
+      next: surah.ayahs[index + 1],
+      options: buildChoiceOptions(
+        surah.ayahs[index + 1].arabic,
+        arabicPool.filter((item) => item !== surah.ayahs[index + 1].arabic && item !== ayah.arabic),
+        4
+      )
+    }));
+    state.quranNextIndex = 0;
+    state.quranNextAnswers = {};
+    state.quranNextComplete = false;
+  }
+
+  function resetQuranOrderRound() {
+    const surah = getQuranSurah();
+    state.quranOrderDeck = shuffle(surah.ayahs.map((ayah) => ({ ...ayah })));
+    state.quranOrderPicked = [];
+    state.quranOrderExpected = 1;
+    state.quranOrderComplete = false;
+    state.quranOrderFeedback = "";
+  }
+
+  function resetQuranSection(keepMode) {
+    state.quranAyahIndex = 0;
+    state.quranRevealMeaning = false;
+    state.quranMeaningRound = [];
+    state.quranMeaningIndex = 0;
+    state.quranMeaningAnswers = {};
+    state.quranMeaningComplete = false;
+    state.quranNextRound = [];
+    state.quranNextIndex = 0;
+    state.quranNextAnswers = {};
+    state.quranNextComplete = false;
+    state.quranOrderDeck = [];
+    state.quranOrderPicked = [];
+    state.quranOrderExpected = 1;
+    state.quranOrderComplete = false;
+    state.quranOrderFeedback = "";
+    if (!keepMode) state.quranMode = null;
+  }
+
+  function setQuranMode(mode) {
+    state.quranMode = mode;
+    state.quranAyahIndex = 0;
+    state.quranRevealMeaning = false;
+    if (mode === "meaning") resetQuranMeaningRound();
+    if (mode === "next-ayah") resetQuranNextRound();
+    if (mode === "order") resetQuranOrderRound();
+  }
+
+  function quranReviewCard() {
+    const surah = getQuranSurah();
+    return surah?.ayahs[state.quranAyahIndex] || surah?.ayahs[0] || null;
+  }
+
+  function quranMeaningItem() {
+    return state.quranMeaningRound[state.quranMeaningIndex] || state.quranMeaningRound[0] || null;
+  }
+
+  function quranNextItem() {
+    return state.quranNextRound[state.quranNextIndex] || state.quranNextRound[0] || null;
+  }
+
+  function activeQuranAyah() {
+    const surah = getQuranSurah();
+    if (!surah) return null;
+    if (state.quranMode === "meaning") return quranMeaningItem()?.ayah || surah.ayahs[0] || null;
+    if (state.quranMode === "next-ayah") return quranNextItem()?.current || surah.ayahs[0] || null;
+    if (state.quranMode === "order") return surah.ayahs[state.quranOrderExpected - 1] || surah.ayahs[surah.ayahs.length - 1] || null;
+    return quranReviewCard();
+  }
+
+  function computeQuranStats() {
+    const totalSurahs = juzAmmaSurahs.length;
+    const totalAyahs = juzAmmaSurahs.reduce((sum, surah) => sum + surah.ayahs.length, 0);
+    const reviewedAyahs = allQuranAyahs().filter(({ surah, ayah }) => {
+      const stats = state.progress.cards[cardId(surah.id, ayah)] || { seen: 0 };
+      return stats.seen > 0;
+    }).length;
+    const strongAyahs = allQuranAyahs().filter(({ surah, ayah }) => {
+      const stats = state.progress.cards[cardId(surah.id, ayah)] || { known: 0, unknown: 0 };
+      return stats.known >= 2 && stats.known > stats.unknown;
+    }).length;
+    return { totalSurahs, totalAyahs, reviewedAyahs, strongAyahs };
+  }
+
   function cardId(lessonId, entry) {
     return `${lessonId}::${entry.arabic}`;
   }
@@ -398,6 +574,18 @@
     state.progress.sessionAnswers += 1;
     markActivity();
     ensureLessonProgressStarted(lessonId);
+    saveSession();
+  }
+
+  function trackQuranAnswer(surahId, ayah, result) {
+    const id = cardId(surahId, ayah);
+    const current = state.progress.cards[id] || { known: 0, unknown: 0, seen: 0 };
+    current.seen += 1;
+    if (result === "known") current.known += 1;
+    if (result === "unknown") current.unknown += 1;
+    state.progress.cards[id] = current;
+    state.progress.sessionAnswers += 1;
+    markActivity();
     saveSession();
   }
 
@@ -497,6 +685,26 @@
       score: stored?.score || 0,
       xp: stored?.xp_earned || 0,
       attempts: stored?.attempts || 0
+    };
+  }
+
+  function computeQuranSurahStats(surah) {
+    const totals = surah.ayahs.reduce(
+      (accumulator, ayah) => {
+        const stats = state.progress.cards[cardId(surah.id, ayah)] || { known: 0, unknown: 0, seen: 0 };
+        accumulator.known += stats.known;
+        accumulator.unknown += stats.unknown;
+        accumulator.seen += stats.seen;
+        if (stats.known >= 2 && stats.known > stats.unknown) accumulator.mastered += 1;
+        return accumulator;
+      },
+      { known: 0, unknown: 0, seen: 0, mastered: 0 }
+    );
+
+    const totalAttempts = totals.known + totals.unknown;
+    return {
+      ...totals,
+      percent: totalAttempts ? Math.round((totals.known / totalAttempts) * 100) : 0
     };
   }
 
@@ -885,7 +1093,7 @@
             <div class="home-hero-copy">
               <p class="home-greeting">${getGreeting()}</p>
               <h1>Madinah Lab</h1>
-              <p>Build strong Madinah Book 1 vocabulary first, then layer in phrases, typing, and pronunciation practice.</p>
+              <p>Build strong Madinah Book 1 vocabulary first, then layer in Juz Amma memorization with Quran.com ayat and The Clear Quran meaning.</p>
             </div>
             <div class="home-ring-card">
               <div class="home-ring-value">${overall.overallProgress}%</div>
@@ -954,11 +1162,11 @@
               </div>
             </div>
             <div class="quick-action-grid">
-              <button class="quick-action-card" data-action="change-section" data-section="alphabet">
-                <div class="quick-action-icon">أ</div>
+              <button class="quick-action-card" data-action="change-section" data-section="quran">
+                <div class="quick-action-icon">۞</div>
                 <div>
-                  <strong>Arabic Alphabet</strong>
-                  <span>Learn the 28 letters with audio</span>
+                  <strong>Juz Amma Memory</strong>
+                  <span>Priority surahs 84 to 114 with ayah meaning drills</span>
                 </div>
               </button>
               <button class="quick-action-card" data-action="start-practice" data-lesson-id="${getPracticeLesson().id}" data-mode="flashcards">
@@ -1305,6 +1513,357 @@
               `
               : ""
           }
+        </div>
+      </section>
+    `;
+  }
+
+  function renderQuranModeChooser() {
+    const surah = getQuranSurah();
+    return `
+      <div class="quran-overview">
+        <div class="quran-intro-card">
+          <strong>Priority Surahs 84-114</strong>
+          <p>Scroll through the surahs, tap one, then choose how you want to memorize it.</p>
+        </div>
+
+        <div class="quran-chapter-list">
+          ${juzAmmaSurahs.map((entry) => {
+            const isActive = entry.id === surah.id;
+            const stats = computeQuranSurahStats(entry);
+            return `
+              <article class="quran-chapter-card ${isActive ? "is-active" : ""}">
+                <button class="quran-chapter-select" data-action="change-quran-surah" data-surah-id="${entry.id}">
+                  <div class="lesson-card-top">
+                    <div class="lesson-badge">Surah ${entry.number}</div>
+                    <div class="status-pill is-in_progress">${entry.verses_count} ayahs</div>
+                  </div>
+                  <div class="quran-chapter-head">
+                    <div>
+                      <h3>${entry.number}. ${entry.name}</h3>
+                      <div class="lesson-arabic arabic-text">${entry.name_ar}</div>
+                    </div>
+                    <div class="quran-chapter-progress">
+                      <strong>${stats.percent}%</strong>
+                      <span>recall</span>
+                    </div>
+                  </div>
+                  <p>${entry.translated_name} • ${entry.revelation_place} • ${stats.mastered}/${entry.verses_count} strong</p>
+                </button>
+                ${
+                  isActive
+                    ? `
+                      <div class="quran-chapter-modes">
+                        ${QURAN_MODES.map(
+                          (mode) => `
+                            <button class="quran-mode-button" data-action="select-quran-mode" data-mode="${mode.key}">
+                              <span class="quran-mode-icon">${mode.icon}</span>
+                              <span>
+                                <strong>${mode.label}</strong>
+                                <small>${mode.labelAr}</small>
+                              </span>
+                            </button>
+                          `
+                        ).join("")}
+                      </div>
+                    `
+                    : ""
+                }
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderQuranReview() {
+    const surah = getQuranSurah();
+    const ayah = quranReviewCard();
+    if (!surah || !ayah) return `<div class="empty-card">No surah data is loaded yet.</div>`;
+
+    return `
+      <div class="quran-session-wrap">
+        <div class="quran-session-card lesson-detail-card">
+          <div class="chapter-progress-meta">${ayah.number} / ${surah.verses_count}</div>
+          <div class="lesson-detail-label">Ayah Review</div>
+          <div class="lesson-note-card">
+            <div class="quran-surah-kicker">${surah.number}. ${surah.name} • ${surah.name_ar}</div>
+            <div class="lesson-word-arabic arabic-text quran-ayah-text">${ayah.arabic}</div>
+            ${
+              state.quranRevealMeaning
+                ? `<div class="quran-meaning">${ayah.meaning}</div>`
+                : `<div class="muted quran-memory-prompt">Recall the meaning first, then reveal it.</div>`
+            }
+            <button class="speaker-button" data-action="speak-quran-ayah">Listen</button>
+          </div>
+        </div>
+        <div class="lesson-detail-actions quran-review-actions">
+          <button class="lesson-nav-button ${state.quranAyahIndex === 0 ? "is-disabled" : ""}" data-action="quran-prev-ayah" ${state.quranAyahIndex === 0 ? "disabled" : ""}>← Previous</button>
+          <button class="lesson-nav-button" data-action="toggle-quran-meaning">${state.quranRevealMeaning ? "Hide meaning" : "Reveal meaning"}</button>
+          <button class="lesson-nav-button is-primary" data-action="quran-next-ayah">${state.quranAyahIndex === surah.ayahs.length - 1 ? "Start again" : "Next →"}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderQuranMeaningQuiz() {
+    const surah = getQuranSurah();
+    const item = quranMeaningItem();
+    const answer = state.quranMeaningAnswers[state.quranMeaningIndex];
+
+    if (state.quranMeaningComplete) {
+      const correct = state.quranMeaningRound.reduce((count, roundItem, index) => count + (state.quranMeaningAnswers[index] === roundItem.ayah.meaning ? 1 : 0), 0);
+      const score = state.quranMeaningRound.length ? Math.round((correct / state.quranMeaningRound.length) * 100) : 0;
+      return `
+        <div class="lesson-complete-card chapter-summary-card">
+          <div class="lesson-complete-icon">💡</div>
+          <h3>Meaning quiz complete</h3>
+          <p>${surah.name} • ${surah.name_ar}</p>
+          <div class="lesson-complete-stats">
+            <div class="summary-card">
+              <strong>${correct}/${state.quranMeaningRound.length}</strong>
+              <span>Correct meanings</span>
+            </div>
+            <div class="summary-card">
+              <strong>${score}%</strong>
+              <span>Score</span>
+            </div>
+          </div>
+          <div class="lesson-detail-actions">
+            <button class="lesson-nav-button" data-action="restart-quran-meaning">Restart</button>
+            <button class="lesson-nav-button is-primary" data-action="back-quran-modes">Pick another method</button>
+          </div>
+        </div>
+      `;
+    }
+
+    if (!item) return `<div class="empty-card">No meaning quiz items are available for this surah yet.</div>`;
+
+    return `
+      <div class="quran-session-wrap">
+        <div class="chapter-practice-card lesson-detail-card">
+          <div class="chapter-progress-meta">${state.quranMeaningIndex + 1} / ${state.quranMeaningRound.length}</div>
+          <div class="lesson-detail-label">Meaning Quiz</div>
+          <div class="lesson-note-card">
+            <div class="muted">Choose the Clear Quran meaning for this ayah.</div>
+            <div class="lesson-word-arabic arabic-text quran-ayah-text">${item.ayah.arabic}</div>
+            <div class="quiz-options">
+              ${item.options.map((option) => {
+                const isSelected = answer === option;
+                const isCorrect = option === item.ayah.meaning;
+                const quizClass = answer
+                  ? isCorrect
+                    ? "is-correct"
+                    : isSelected
+                      ? "is-wrong"
+                      : ""
+                  : "";
+                return `
+                  <button class="quiz-option ${quizClass}" data-action="answer-quran-meaning" data-option="${escapeHtml(option)}" ${answer ? "disabled" : ""}>
+                    <span>${option}</span>
+                  </button>
+                `;
+              }).join("")}
+            </div>
+            ${
+              answer
+                ? `<div class="feedback ${answer === item.ayah.meaning ? "is-good" : "is-bad"}">${
+                    answer === item.ayah.meaning ? "Correct." : `Correct meaning: ${item.ayah.meaning}`
+                  }</div>`
+                : `<div class="muted">Choose 1 of 4 meanings.</div>`
+            }
+          </div>
+        </div>
+        <div class="lesson-detail-actions chapter-practice-actions">
+          <button class="lesson-nav-button ${state.quranMeaningIndex === 0 ? "is-disabled" : ""}" data-action="quran-meaning-prev" ${state.quranMeaningIndex === 0 ? "disabled" : ""}>← Previous</button>
+          <button class="lesson-nav-button is-primary" data-action="${state.quranMeaningIndex === state.quranMeaningRound.length - 1 ? "complete-quran-meaning" : "quran-meaning-next"}" ${!answer ? "disabled" : ""}>
+            ${state.quranMeaningIndex === state.quranMeaningRound.length - 1 ? "Finish quiz" : "Next →"}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderQuranNextAyah() {
+    const surah = getQuranSurah();
+    const item = quranNextItem();
+    const answer = state.quranNextAnswers[state.quranNextIndex];
+
+    if (state.quranNextComplete) {
+      const correct = state.quranNextRound.reduce((count, roundItem, index) => count + (state.quranNextAnswers[index] === roundItem.next.arabic ? 1 : 0), 0);
+      const score = state.quranNextRound.length ? Math.round((correct / state.quranNextRound.length) * 100) : 0;
+      return `
+        <div class="lesson-complete-card chapter-summary-card">
+          <div class="lesson-complete-icon">➡</div>
+          <h3>Next ayah round complete</h3>
+          <p>${surah.name} • ${surah.name_ar}</p>
+          <div class="lesson-complete-stats">
+            <div class="summary-card">
+              <strong>${correct}/${state.quranNextRound.length}</strong>
+              <span>Sequence correct</span>
+            </div>
+            <div class="summary-card">
+              <strong>${score}%</strong>
+              <span>Score</span>
+            </div>
+          </div>
+          <div class="lesson-detail-actions">
+            <button class="lesson-nav-button" data-action="restart-quran-next">Restart</button>
+            <button class="lesson-nav-button is-primary" data-action="back-quran-modes">Pick another method</button>
+          </div>
+        </div>
+      `;
+    }
+
+    if (!item) return `<div class="empty-card">This surah needs at least two ayahs for next-ayah practice.</div>`;
+
+    return `
+      <div class="quran-session-wrap">
+        <div class="chapter-practice-card lesson-detail-card">
+          <div class="chapter-progress-meta">${state.quranNextIndex + 1} / ${state.quranNextRound.length}</div>
+          <div class="lesson-detail-label">Next Ayah</div>
+          <div class="lesson-note-card">
+            <div class="muted">Which ayah comes next in ${surah.name}?</div>
+            <div class="lesson-word-arabic arabic-text quran-ayah-text">${item.current.arabic}</div>
+            <div class="quiz-options">
+              ${item.options.map((option) => {
+                const isSelected = answer === option;
+                const isCorrect = option === item.next.arabic;
+                const quizClass = answer
+                  ? isCorrect
+                    ? "is-correct"
+                    : isSelected
+                      ? "is-wrong"
+                      : ""
+                  : "";
+                return `
+                  <button class="quiz-option ${quizClass}" data-action="answer-quran-next" data-option="${escapeHtml(option)}" ${answer ? "disabled" : ""}>
+                    <span class="arabic-text">${option}</span>
+                  </button>
+                `;
+              }).join("")}
+            </div>
+            ${
+              answer
+                ? `<div class="feedback ${answer === item.next.arabic ? "is-good" : "is-bad"}">${
+                    answer === item.next.arabic ? "Correct." : `Correct ayah: <span class="arabic-text">${item.next.arabic}</span>`
+                  }</div>`
+                : `<div class="muted">Choose the next ayah from the four options.</div>`
+            }
+          </div>
+        </div>
+        <div class="lesson-detail-actions chapter-practice-actions">
+          <button class="lesson-nav-button ${state.quranNextIndex === 0 ? "is-disabled" : ""}" data-action="quran-next-prev" ${state.quranNextIndex === 0 ? "disabled" : ""}>← Previous</button>
+          <button class="lesson-nav-button is-primary" data-action="${state.quranNextIndex === state.quranNextRound.length - 1 ? "complete-quran-next" : "quran-next-next"}" ${!answer ? "disabled" : ""}>
+            ${state.quranNextIndex === state.quranNextRound.length - 1 ? "Finish round" : "Next →"}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderQuranOrder() {
+    const surah = getQuranSurah();
+
+    if (state.quranOrderComplete) {
+      return `
+        <div class="lesson-complete-card chapter-summary-card">
+          <div class="lesson-complete-icon">🧩</div>
+          <h3>Order complete</h3>
+          <p>${surah.name} • ${surah.name_ar}</p>
+          <div class="lesson-complete-stats">
+            <div class="summary-card">
+              <strong>${surah.ayahs.length}</strong>
+              <span>Ayahs ordered</span>
+            </div>
+            <div class="summary-card">
+              <strong>${computeQuranSurahStats(surah).mastered}</strong>
+              <span>Ayahs strong</span>
+            </div>
+          </div>
+          <div class="lesson-detail-actions">
+            <button class="lesson-nav-button" data-action="reset-quran-order">Restart order</button>
+            <button class="lesson-nav-button is-primary" data-action="back-quran-modes">Pick another method</button>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="quran-session-wrap">
+        <div class="chapter-practice-card lesson-detail-card">
+          <div class="chapter-progress-meta">${state.quranOrderPicked.length} / ${surah.ayahs.length}</div>
+          <div class="lesson-detail-label">Ayah Order</div>
+          <div class="lesson-note-card">
+            <div class="muted">Tap the ayahs in the correct order from beginning to end.</div>
+            <div class="quran-picked-list">
+              ${state.quranOrderPicked.length
+                ? state.quranOrderPicked.map((ayah) => `<div class="quran-picked-pill"><strong>${ayah.number}</strong><span class="arabic-text">${ayah.arabic}</span></div>`).join("")
+                : `<div class="muted">No ayahs placed yet.</div>`}
+            </div>
+            <div class="quran-order-grid">
+              ${state.quranOrderDeck.map((ayah) => {
+                const picked = state.quranOrderPicked.some((item) => item.number === ayah.number);
+                return `
+                  <button class="order-ayah-card ${picked ? "is-picked" : ""}" data-action="pick-quran-order" data-ayah-number="${ayah.number}" ${picked ? "disabled" : ""}>
+                    <strong>${ayah.number}</strong>
+                    <span class="arabic-text">${ayah.arabic}</span>
+                  </button>
+                `;
+              }).join("")}
+            </div>
+            ${state.quranOrderFeedback ? `<div class="feedback ${state.quranOrderFeedback.startsWith("Correct") ? "is-good" : "is-bad"}">${state.quranOrderFeedback}</div>` : ""}
+          </div>
+        </div>
+        <div class="lesson-detail-actions chapter-practice-actions">
+          <button class="lesson-nav-button" data-action="reset-quran-order">Restart</button>
+          <button class="lesson-nav-button is-primary" data-action="speak-quran-ayah">Hear current ayah</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderQuranBody() {
+    if (!state.quranMode) return renderQuranModeChooser();
+    if (state.quranMode === "review") return renderQuranReview();
+    if (state.quranMode === "meaning") return renderQuranMeaningQuiz();
+    if (state.quranMode === "next-ayah") return renderQuranNextAyah();
+    return renderQuranOrder();
+  }
+
+  function renderQuran() {
+    const surah = getQuranSurah();
+    const stats = computeQuranSurahStats(surah);
+    const progressValue =
+      state.quranMode === "review"
+        ? Math.round(((state.quranAyahIndex + 1) / Math.max(surah.ayahs.length, 1)) * 100)
+        : state.quranMode === "meaning"
+        ? state.quranMeaningComplete
+          ? 100
+          : Math.round((state.quranMeaningIndex / Math.max(state.quranMeaningRound.length, 1)) * 100)
+        : state.quranMode === "next-ayah"
+        ? state.quranNextComplete
+          ? 100
+          : Math.round((state.quranNextIndex / Math.max(state.quranNextRound.length, 1)) * 100)
+        : state.quranMode === "order"
+        ? surah.ayahs.length
+          ? Math.round((state.quranOrderPicked.length / surah.ayahs.length) * 100)
+          : 0
+        : stats.percent;
+
+    return `
+      <section class="panel quran-screen">
+        <div class="practice-screen-head">
+          <button class="back-button" data-action="${state.quranMode ? "back-quran-modes" : "change-section"}" data-section="home">&larr;</button>
+          <div class="practice-title-wrap">
+            <h2>Juz Amma Memory</h2>
+            <p>${state.quranMode ? (QURAN_MODES.find((mode) => mode.key === state.quranMode)?.label || "Memorization") : "Priority track: Surahs 84–114"}</p>
+          </div>
+        </div>
+        <div class="practice-progress"><span style="width:${Math.max(progressValue, state.quranMode ? 8 : 0)}%;"></span></div>
+        <div class="quran-layout ${state.quranMode ? "is-active-session" : "is-chooser"}">
+          <div class="quran-body">${renderQuranBody()}</div>
         </div>
       </section>
     `;
@@ -1669,6 +2228,7 @@
 
   function renderProgress() {
     const overall = computeOverallStats();
+    const quran = computeQuranStats();
 
     return `
       <section class="panel progress-board">
@@ -1727,6 +2287,53 @@
                 .join("")}
             </div>
           </div>
+          <div class="section-block">
+            <div class="section-head">
+              <div>
+                <h2>Juz Amma Memory</h2>
+                <p>Quran.com Arabic ayat with The Clear Quran meaning.</p>
+              </div>
+            </div>
+            <div class="home-stats-grid">
+              <div class="summary-card">
+                <strong>${quran.totalSurahs}</strong>
+                <span>Priority surahs</span>
+              </div>
+              <div class="summary-card">
+                <strong>${quran.totalAyahs}</strong>
+                <span>Total ayahs</span>
+              </div>
+              <div class="summary-card">
+                <strong>${quran.reviewedAyahs}</strong>
+                <span>Ayahs reviewed</span>
+              </div>
+              <div class="summary-card">
+                <strong>${quran.strongAyahs}</strong>
+                <span>Ayahs strong</span>
+              </div>
+            </div>
+            <div class="summary-grid progress-grid">
+              ${juzAmmaSurahs
+                .map((surah) => {
+                  const stats = computeQuranSurahStats(surah);
+                  return `
+                    <div class="progress-row">
+                      <div class="progress-row-top">
+                        <strong>${surah.number}. ${surah.name}</strong>
+                        <div class="status-pill is-in_progress">${surah.revelation_place}</div>
+                      </div>
+                      <div class="muted">${surah.name_ar} • ${surah.translated_name}</div>
+                      <div class="progress-bar"><span style="width:${stats.percent}%;"></span></div>
+                      <div class="lesson-meta-row">
+                        <span>${stats.mastered}/${surah.ayahs.length} strong</span>
+                        <span>${stats.seen} reviews</span>
+                      </div>
+                    </div>
+                  `;
+                })
+                .join("")}
+            </div>
+          </div>
         </div>
       </section>
     `;
@@ -1735,7 +2342,7 @@
   function renderCurrentSection() {
     if (state.section === "home") return renderHome();
     if (state.section === "lessons") return renderLessons();
-    if (state.section === "alphabet") return renderAlphabet();
+    if (state.section === "quran") return renderQuran();
     if (state.section === "practice") return renderPractice();
     return renderProgress();
   }
@@ -1750,7 +2357,7 @@
           ${[
             ["home", "⌂", "Home"],
             ["lessons", "📘", "Lessons"],
-            ["alphabet", "أ", "Alphabet"],
+            ["quran", "۞", "Quran"],
             ["practice", "🎙", "Practice"],
             ["progress", "📈", "Progress"]
           ]
@@ -1827,6 +2434,85 @@
       if (state.alphabetSelected) speakArabic(state.alphabetSelected.letter);
     }
     if (action === "close-alphabet-letter") state.alphabetSelected = null;
+
+    if (action === "change-quran-surah") {
+      state.quranSurahId = target.dataset.surahId || state.quranSurahId;
+      resetQuranSection(false);
+    }
+
+    if (action === "select-quran-mode") setQuranMode(target.dataset.mode);
+    if (action === "back-quran-modes") resetQuranSection(false);
+
+    if (action === "quran-prev-ayah") {
+      state.quranAyahIndex = Math.max(0, state.quranAyahIndex - 1);
+      state.quranRevealMeaning = false;
+    }
+
+    if (action === "quran-next-ayah") {
+      const surah = getQuranSurah();
+      const ayah = quranReviewCard();
+      if (surah && ayah) trackQuranAnswer(surah.id, ayah, "seen");
+      state.quranAyahIndex = surah && state.quranAyahIndex === surah.ayahs.length - 1 ? 0 : state.quranAyahIndex + 1;
+      state.quranRevealMeaning = false;
+    }
+
+    if (action === "toggle-quran-meaning") {
+      const surah = getQuranSurah();
+      const ayah = quranReviewCard();
+      if (!state.quranRevealMeaning && surah && ayah) trackQuranAnswer(surah.id, ayah, "seen");
+      state.quranRevealMeaning = !state.quranRevealMeaning;
+    }
+
+    if (action === "answer-quran-meaning") {
+      const surah = getQuranSurah();
+      const item = quranMeaningItem();
+      if (surah && item && !state.quranMeaningAnswers[state.quranMeaningIndex]) {
+        state.quranMeaningAnswers[state.quranMeaningIndex] = target.dataset.option;
+        trackQuranAnswer(surah.id, item.ayah, target.dataset.option === item.ayah.meaning ? "known" : "unknown");
+      }
+    }
+
+    if (action === "quran-meaning-prev") state.quranMeaningIndex = Math.max(0, state.quranMeaningIndex - 1);
+    if (action === "quran-meaning-next") state.quranMeaningIndex = Math.min(state.quranMeaningRound.length - 1, state.quranMeaningIndex + 1);
+    if (action === "complete-quran-meaning") state.quranMeaningComplete = true;
+    if (action === "restart-quran-meaning") resetQuranMeaningRound();
+
+    if (action === "answer-quran-next") {
+      const surah = getQuranSurah();
+      const item = quranNextItem();
+      if (surah && item && !state.quranNextAnswers[state.quranNextIndex]) {
+        state.quranNextAnswers[state.quranNextIndex] = target.dataset.option;
+        trackQuranAnswer(surah.id, item.next, target.dataset.option === item.next.arabic ? "known" : "unknown");
+      }
+    }
+
+    if (action === "quran-next-prev") state.quranNextIndex = Math.max(0, state.quranNextIndex - 1);
+    if (action === "quran-next-next") state.quranNextIndex = Math.min(state.quranNextRound.length - 1, state.quranNextIndex + 1);
+    if (action === "complete-quran-next") state.quranNextComplete = true;
+    if (action === "restart-quran-next") resetQuranNextRound();
+
+    if (action === "pick-quran-order") {
+      const surah = getQuranSurah();
+      const ayahNumber = Number(target.dataset.ayahNumber);
+      const choice = state.quranOrderDeck.find((ayah) => ayah.number === ayahNumber);
+      const expectedAyah = surah?.ayahs[state.quranOrderExpected - 1];
+      const alreadyPicked = state.quranOrderPicked.some((ayah) => ayah.number === ayahNumber);
+
+      if (surah && choice && expectedAyah && !alreadyPicked && !state.quranOrderComplete) {
+        if (choice.number === expectedAyah.number) {
+          state.quranOrderPicked = state.quranOrderPicked.concat(choice);
+          state.quranOrderExpected += 1;
+          state.quranOrderFeedback = `Correct: ayah ${choice.number} is next.`;
+          trackQuranAnswer(surah.id, choice, "known");
+          if (state.quranOrderPicked.length === surah.ayahs.length) state.quranOrderComplete = true;
+        } else {
+          state.quranOrderFeedback = `Try again. Ayah ${expectedAyah.number} comes next.`;
+          trackQuranAnswer(surah.id, expectedAyah, "unknown");
+        }
+      }
+    }
+
+    if (action === "reset-quran-order") resetQuranOrderRound();
 
     if (action === "change-practice-lesson") {
       const currentMode = state.practiceMode;
@@ -1930,6 +2616,8 @@
         speakArabic(item?.arabic || "");
       }
     }
+
+    if (action === "speak-quran-ayah") speakArabic(activeQuranAyah()?.arabic || "");
 
     if (action === "speak-text") speakArabic(target.dataset.text);
     render();
