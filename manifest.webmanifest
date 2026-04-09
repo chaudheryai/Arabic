@@ -1,0 +1,17 @@
+{
+  "name": "Madinah Lab",
+  "short_name": "Madinah Lab",
+  "description": "Mobile-first Madinah Book 1 Arabic practice with flashcards, typing drills, matching, and pronunciation checks.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#10282f",
+  "theme_color": "#12343b",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
