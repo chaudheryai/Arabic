@@ -187,6 +187,128 @@
     return [grammarNote].concat(phrases).concat(vocabulary).concat(quizTargets);
   }
 
+  function uniqueStrings(items) {
+    return Array.from(new Set(items.filter(Boolean)));
+  }
+
+  function buildChoiceOptions(correctAnswer, pool, count) {
+    const distractors = sample(uniqueStrings(pool).filter((item) => item !== correctAnswer), Math.max(0, count - 1));
+    return shuffle([correctAnswer].concat(distractors));
+  }
+
+  function buildLessonQuizItem(config) {
+    return {
+      type: "quiz",
+      arabic: config.arabic || "",
+      transliteration: config.transliteration || "",
+      english: config.prompt,
+      audio_hint: config.audioHint || "",
+      options: config.options,
+      correct_answer: config.correctAnswer,
+      option_language: config.optionLanguage || "arabic",
+      id: config.id
+    };
+  }
+
+  function buildLessonContent(raw, vocabulary, phrases) {
+    const overviewNote = {
+      type: "grammar_note",
+      arabic: phrases[0]?.arabic || vocabulary[0]?.arabic || "",
+      transliteration: raw.focus,
+      english: `${raw.focus}. This lesson includes ${phrases.length} core example${phrases.length === 1 ? "" : "s"} and ${vocabulary.length} vocabulary item${vocabulary.length === 1 ? "" : "s"} before the lesson checks.`,
+      audio_hint: raw.sourcePage ? `Source: ${raw.sourcePage}` : "",
+      id: `${raw.id}-overview`
+    };
+
+    const coachingNote = {
+      type: "grammar_note",
+      arabic: phrases[0]?.arabic || "",
+      transliteration: "Lesson flow",
+      english: `Start by reading the Arabic aloud, then check the English, and finally answer in both directions. Focus especially on ${vocabulary.slice(0, Math.min(4, vocabulary.length)).map((entry) => entry.english).join(", ")}.`,
+      audio_hint: "Tap Listen on the Arabic cards, then move into the lesson checks.",
+      id: `${raw.id}-coach`
+    };
+
+    const phraseBridgeNote = phrases.length > 1
+      ? {
+          type: "grammar_note",
+          arabic: phrases[1]?.arabic || "",
+          transliteration: "Pattern check",
+          english: "Compare the examples before moving on. Notice what stays the same in the sentence pattern and what changes from one example to the next.",
+          audio_hint: "Read the examples back to back out loud.",
+          id: `${raw.id}-pattern`
+        }
+      : null;
+
+    const drillNote = {
+      type: "grammar_note",
+      arabic: vocabulary[0]?.arabic || "",
+      transliteration: "Vocabulary drill",
+      english: "Now work through the vocabulary one item at a time. Try to recall the meaning before you check it, then repeat the Arabic again with the correct ending.",
+      audio_hint: "If a word feels weak, repeat it three times before moving on.",
+      id: `${raw.id}-drill`
+    };
+
+    const lessonQuizzes = vocabulary.slice(0, Math.min(4, vocabulary.length)).flatMap((entry, quizIndex) => {
+      const arabicPool = vocabulary.filter((item) => item.id !== entry.id).map((item) => item.arabic);
+      const englishPool = vocabulary.filter((item) => item.id !== entry.id).map((item) => item.english);
+
+      return [
+        buildLessonQuizItem({
+          id: `${raw.id}-quiz-en-${quizIndex}`,
+          prompt: `Choose the Arabic for "${entry.english}".`,
+          audioHint: "English to Arabic",
+          options: buildChoiceOptions(entry.arabic, arabicPool, 4),
+          correctAnswer: entry.arabic,
+          optionLanguage: "arabic"
+        }),
+        buildLessonQuizItem({
+          id: `${raw.id}-quiz-ar-${quizIndex}`,
+          prompt: "Choose the English meaning of this Arabic word.",
+          arabic: entry.arabic,
+          audioHint: "Arabic to English",
+          options: buildChoiceOptions(entry.english, englishPool, 4),
+          correctAnswer: entry.english,
+          optionLanguage: "english"
+        })
+      ];
+    });
+
+    const phraseQuizzes = phrases.slice(0, Math.min(2, phrases.length)).map((entry, phraseIndex) =>
+      buildLessonQuizItem({
+        id: `${raw.id}-quiz-phrase-${phraseIndex}`,
+        prompt: "Choose the English meaning of this phrase.",
+        arabic: entry.arabic,
+        audioHint: "Phrase meaning check",
+        options: buildChoiceOptions(
+          entry.english,
+          phrases.filter((item) => item.id !== entry.id).map((item) => item.english).concat(vocabulary.map((item) => item.english)),
+          4
+        ),
+        correctAnswer: entry.english,
+        optionLanguage: "english"
+      })
+    );
+
+    const recapNote = {
+      type: "grammar_note",
+      arabic: phrases[phrases.length - 1]?.arabic || vocabulary[vocabulary.length - 1]?.arabic || "",
+      transliteration: "Recap",
+      english: `You are ready to finish this lesson when you can recognize the key pattern for ${raw.focus.toLowerCase()} and move between Arabic and English without guessing on the core vocabulary.`,
+      audio_hint: "Complete the lesson, then open flashcards or quiz mode if you want another round.",
+      id: `${raw.id}-recap`
+    };
+
+    return [overviewNote, coachingNote]
+      .concat(phraseBridgeNote ? [phraseBridgeNote] : [])
+      .concat(phrases)
+      .concat([drillNote])
+      .concat(vocabulary)
+      .concat(lessonQuizzes)
+      .concat(phraseQuizzes)
+      .concat([recapNote]);
+  }
+
   function today() {
     return new Date().toISOString().slice(0, 10);
   }
@@ -994,6 +1116,81 @@
     return "";
   }
 
+  function renderLessonItem(item, answer, quizAction) {
+    if (item.type === "vocab" || item.type === "phrase") {
+      return `
+        <div class="lesson-detail-label">${item.type === "vocab" ? "Vocabulary" : "Phrase"}</div>
+        <div class="lesson-word-card">
+          <div class="lesson-word-arabic arabic-text">${item.arabic}</div>
+          ${item.transliteration ? `<div class="lesson-word-transliteration">${item.transliteration}</div>` : ""}
+          <div class="lesson-word-english">${item.english}</div>
+          <button class="speaker-button" data-action="speak-text" data-text="${escapeHtml(item.arabic)}">Listen</button>
+          ${item.audio_hint ? `<div class="lesson-note-bubble">${item.audio_hint}</div>` : ""}
+        </div>
+      `;
+    }
+
+    if (item.type === "grammar_note") {
+      return `
+        <div class="lesson-detail-label is-secondary">Grammar Note</div>
+        <div class="lesson-note-card">
+          ${item.arabic ? `<div class="lesson-note-arabic arabic-text">${item.arabic}</div>` : ""}
+          <p>${item.english}</p>
+          ${item.transliteration ? `<div class="lesson-word-transliteration">${item.transliteration}</div>` : ""}
+          ${item.audio_hint ? `<div class="lesson-note-bubble">${item.audio_hint}</div>` : ""}
+        </div>
+      `;
+    }
+
+    if (item.type === "quiz") {
+      const optionClassName = item.option_language === "arabic" ? "arabic-text" : "";
+      const feedbackLabel = item.option_language === "arabic"
+        ? `Correct answer: <span class="arabic-text">${item.correct_answer}</span>`
+        : `Correct answer: ${item.correct_answer}`;
+      const promptHint = item.audio_hint || (item.option_language === "arabic" ? "Choose the right Arabic word to continue." : "Choose the correct English meaning to continue.");
+
+      return `
+        <div class="lesson-detail-label">Quiz</div>
+        <div class="lesson-note-card">
+          ${item.arabic ? `<div class="lesson-quiz-prompt-arabic arabic-text">${item.arabic}</div>` : ""}
+          <h3>${item.english}</h3>
+          ${item.audio_hint ? `<div class="lesson-note-bubble is-quiz">${item.audio_hint}</div>` : ""}
+          <div class="quiz-options">
+            ${(item.options || [])
+              .map((option) => {
+                const isSelected = answer === option;
+                const isCorrect = option === item.correct_answer;
+                const quizClass = answer
+                  ? isCorrect
+                    ? "is-correct"
+                    : isSelected
+                      ? "is-wrong"
+                      : ""
+                  : isSelected
+                    ? "is-selected"
+                    : "";
+                return `
+                  <button class="quiz-option ${quizClass}" data-action="${quizAction}" data-option="${escapeHtml(option)}" ${answer ? "disabled" : ""}>
+                    <span class="${optionClassName}">${option}</span>
+                  </button>
+                `;
+              })
+              .join("")}
+          </div>
+          ${
+            answer
+              ? `<div class="feedback ${answer === item.correct_answer ? "is-good" : "is-bad"}">${
+                  answer === item.correct_answer ? "Correct." : feedbackLabel
+                }</div>`
+              : `<div class="muted">${promptHint}</div>`
+          }
+        </div>
+      `;
+    }
+
+    return "";
+  }
+
   function renderLessonComplete(lesson) {
     const quizItems = lesson.content.filter((item) => item.type === "quiz");
     const correct = quizItems.reduce((count, item) => {
@@ -1424,6 +1621,7 @@
   function renderPractice() {
     const lesson = getPracticeLesson();
     const lessonStats = computeLessonStats(lesson);
+    const isChooser = !state.practiceMode;
     const progressValue =
       state.practiceMode === "quiz"
         ? state.quizComplete
@@ -1445,27 +1643,22 @@
           </div>
         </div>
         <div class="practice-progress"><span style="width:${Math.max(progressValue, state.practiceMode ? 8 : 0)}%;"></span></div>
-        <div class="practice-layout">
-          <div class="lesson-strip">
-            ${lessons
-              .map(
-                (entry) => `
-                  <button class="lesson-chip ${entry.id === lesson.id ? "is-active" : ""}" data-action="change-practice-lesson" data-lesson-id="${entry.id}">
-                    <strong>${entry.label}</strong>
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
+        <div class="practice-layout ${isChooser ? "is-chooser" : "is-active-session"}">
           ${
-            state.practiceMode
-              ? `<div class="mode-row">${PRACTICE_MODES.map(
-                  (mode) => `
-                    <button class="mode-chip ${state.practiceMode === mode.key ? "is-active" : ""}" data-action="select-practice-mode" data-mode="${mode.key}">
-                      <strong>${mode.label}</strong>
-                    </button>
-                  `
-                ).join("")}</div>`
+            isChooser
+              ? `
+                <div class="lesson-strip">
+                  ${lessons
+                    .map(
+                      (entry) => `
+                        <button class="lesson-chip ${entry.id === lesson.id ? "is-active" : ""}" data-action="change-practice-lesson" data-lesson-id="${entry.id}">
+                          <strong>${entry.label}</strong>
+                        </button>
+                      `
+                    )
+                    .join("")}
+                </div>
+              `
               : ""
           }
           <div class="practice-body">${renderPracticeBody()}</div>
