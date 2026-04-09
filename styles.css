@@ -826,15 +826,23 @@ body {
   color: #1f2b33;
 }
 
+#app {
+  min-height: 100dvh;
+  padding: 0;
+}
+
 .app-shell {
   width: min(100%, 430px);
   max-width: 430px;
+  min-height: 100dvh;
+  height: 100dvh;
   height: 100svh;
+  max-height: 100dvh;
   max-height: 100svh;
   background: #f8f7f4;
   border: 1px solid #cfd6dd;
   border-radius: 18px;
-  padding: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 0 0;
   gap: 0;
   box-shadow: 0 20px 50px rgba(28, 39, 49, 0.12);
 }
@@ -1369,6 +1377,7 @@ body {
   border-bottom: 0;
   border-radius: 0 0 18px 18px;
   box-shadow: none;
+  padding: 8px 8px max(8px, env(safe-area-inset-bottom, 0px));
 }
 
 .nav-button {
