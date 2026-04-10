@@ -922,7 +922,7 @@ body {
 .main-stage {
   min-height: 0;
   background: #f8f7f4;
-  padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px) + 4px);
+  padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px) + 2px);
 }
 
 .panel {
@@ -1414,6 +1414,13 @@ body {
   font-weight: 600;
 }
 
+.quran-ayah-reference {
+  text-align: center;
+  color: #1d9b8a;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .quran-ayah-text {
   font-size: clamp(1.9rem, 8.8vw, 3.25rem);
   line-height: 1.65;
@@ -1437,6 +1444,46 @@ body {
 .quran-order-grid {
   display: grid;
   gap: 10px;
+}
+
+.quran-word-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  direction: rtl;
+}
+
+.quran-word-card {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 12px 10px;
+  border: 1px solid #e1ddd4;
+  border-radius: 16px;
+  background: #f8f7f4;
+  text-align: center;
+}
+
+.quran-word-arabic {
+  color: #18232c;
+  font-size: 1.55rem;
+  line-height: 1.25;
+}
+
+.quran-word-meaning {
+  color: #1d9b8a;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  direction: ltr;
+}
+
+.quran-word-ayah-meaning {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #eef7f5;
+  color: #17353b;
+  text-align: center;
+  line-height: 1.6;
 }
 
 .order-ayah-card {
@@ -2486,6 +2533,23 @@ body {
 
   .quran-ayah-text {
     font-size: clamp(1.8rem, 8vw, 2.7rem);
+  }
+
+  .quran-word-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .quran-word-card {
+    padding: 10px 8px;
+  }
+
+  .quran-word-arabic {
+    font-size: 1.35rem;
+  }
+
+  .quran-word-meaning {
+    font-size: 0.74rem;
   }
 
   .quran-review-actions .lesson-nav-button {
