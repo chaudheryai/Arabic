@@ -25,11 +25,11 @@
   ];
 
   const PRACTICE_MODES = [
-    { key: "quiz", label: "Quiz", labelAr: "اختبار", note: "4-choice cumulative lesson quizzes", icon: "❓" },
-    { key: "flashcards", label: "Flashcards", labelAr: "بطاقات", note: "Test both directions with retries", icon: "🗂" },
-    { key: "matching", label: "Matching", labelAr: "مطابقة", note: "Pair Arabic with English", icon: "🎯" },
-    { key: "typing", label: "Typing", labelAr: "كتابة", note: "Practice spelling and haraqat", icon: "⌨" },
-    { key: "pronunciation", label: "Pronunciation", labelAr: "نطق", note: "Listen, speak, and compare", icon: "🎙" }
+    { key: "quiz", label: "Quiz", labelAr: "اختبار", note: "Pick the right answer from 4 choices — good for quick review", icon: "❓" },
+    { key: "flashcards", label: "Say & Translate", labelAr: "قُل وترجِم", note: "See the word — say it aloud — translate it to yourself — then reveal", icon: "🗂" },
+    { key: "matching", label: "Matching", labelAr: "مطابقة", note: "Tap an Arabic word then its English pair to match them", icon: "🎯" },
+    { key: "grammar", label: "Grammar Challenge", labelAr: "تحدي القواعد", note: "Apply the grammar rule — answer questions about this lesson's pattern", icon: "📐" },
+    { key: "builder", label: "Sentence Builder", labelAr: "بناء الجملة", note: "Arrange shuffled word tiles into the correct Arabic sentence", icon: "🧩" }
   ];
 
   const QURAN_MODES = [
@@ -122,6 +122,14 @@
     matchSelection: [],
     matchSolved: [],
     matchFeedback: "",
+    grammarIndex: 0,
+    grammarAnswers: {},
+    grammarComplete: false,
+    builderPhraseIndex: 0,
+    builderPicked: [],
+    builderAvailable: [],
+    builderFeedback: null,
+    builderComplete: false,
     typingDirection: "en-to-ar",
     typingStrict: true,
     typingIndex: 0,
@@ -169,6 +177,8 @@
       icon: pickLessonIcon(index),
       sourcePage: raw.sourcePage || "",
       focus: raw.focus,
+      grammarNote: raw.grammarNote || "",
+      challenges: (window.APP_CHALLENGES || {})[raw.id] || [],
       phrases,
       vocabulary
     };
@@ -277,7 +287,7 @@
       type: "grammar_note",
       arabic: phrases[0]?.arabic || vocabulary[0]?.arabic || "",
       transliteration: raw.focus,
-      english: `${raw.focus}. This lesson includes ${phrases.length} core example${phrases.length === 1 ? "" : "s"} and ${vocabulary.length} vocabulary item${vocabulary.length === 1 ? "" : "s"} before the lesson checks.`,
+      english: raw.grammarNote || `${raw.focus}. This lesson includes ${phrases.length} core example${phrases.length === 1 ? "" : "s"} and ${vocabulary.length} vocabulary item${vocabulary.length === 1 ? "" : "s"} before the lesson checks.`,
       audio_hint: raw.sourcePage ? `Source: ${raw.sourcePage}` : "",
       id: `${raw.id}-overview`
     };
@@ -953,20 +963,20 @@
 
   function resetMatchRound() {
     const lesson = getPracticeLesson();
-    const picks = sample(lesson.vocabulary, lesson.vocabulary.length > 5 ? 6 : lesson.vocabulary.length);
+    const picks = sample(lesson.vocabulary, Math.min(4, lesson.vocabulary.length));
     const leftSide = picks.map((entry, index) => ({
       id: `${index}-ar`,
       pairId: index,
       side: "arabic",
       label: entry.arabic
     }));
-    const rightSide = shuffle(picks).map((entry, index) => ({
-      id: `${index}-en`,
-      pairId: picks.findIndex((candidate) => candidate.id === entry.id),
+    const rightSide = shuffle(picks.slice()).map((entry) => ({
+      id: `${picks.indexOf(entry)}-en`,
+      pairId: picks.indexOf(entry),
       side: "english",
       label: entry.english
     }));
-    state.matchRound = shuffle(leftSide.concat(rightSide));
+    state.matchRound = leftSide.concat(rightSide);
     state.matchSelection = [];
     state.matchSolved = [];
     state.matchFeedback = "";
@@ -1058,6 +1068,29 @@
     state.pronunciationTranscript = "";
   }
 
+  function resetGrammarChallenge() {
+    state.grammarIndex = 0;
+    state.grammarAnswers = {};
+    state.grammarComplete = false;
+  }
+
+  function resetSentenceBuilder() {
+    const lesson = getPracticeLesson();
+    state.builderPhraseIndex = 0;
+    state.builderComplete = false;
+    state.builderFeedback = null;
+    loadBuilderPhrase(lesson);
+  }
+
+  function loadBuilderPhrase(lesson) {
+    const phrase = (lesson.phrases || [])[state.builderPhraseIndex];
+    if (!phrase) { state.builderComplete = true; return; }
+    const tokens = phrase.arabic.split(/\s+/).filter(Boolean);
+    state.builderAvailable = shuffle(tokens.map((text, i) => ({ id: `${i}-${text}`, text })));
+    state.builderPicked = [];
+    state.builderFeedback = null;
+  }
+
   function setPracticeMode(mode) {
     state.practiceMode = mode;
     if (mode === "quiz") resetQuizRound();
@@ -1065,6 +1098,8 @@
     if (mode === "matching") resetMatchRound();
     if (mode === "typing") resetTyping();
     if (mode === "pronunciation") resetPronunciation();
+    if (mode === "grammar") resetGrammarChallenge();
+    if (mode === "builder") resetSentenceBuilder();
   }
 
   function resetPracticeSelection(lessonId) {
@@ -2070,14 +2105,17 @@
     const promptIsArabic = card.direction === "ar-to-en";
     const prompt = promptIsArabic ? card.entry.arabic : card.entry.english;
     const answer = promptIsArabic ? card.entry.english : card.entry.arabic;
+    const speakCue = promptIsArabic
+      ? "Say it aloud in Arabic, then translate it to yourself in English"
+      : "Translate this to Arabic in your head, then say the Arabic word aloud";
 
     return `
       <div class="toolbar">
         <div class="toolbar-row">
           <div class="segmented">
             ${[
-              ["ar-to-en", "عربي ← إنجليزي"],
-              ["en-to-ar", "إنجليزي ← عربي"],
+              ["ar-to-en", "Arabic → English"],
+              ["en-to-ar", "English → Arabic"],
               ["mixed", "Mixed"]
             ]
               .map(
@@ -2090,12 +2128,12 @@
               .join("")}
           </div>
           <button class="pill-button ${state.flashShuffle ? "is-on" : ""}" data-action="toggle-flash-shuffle">Shuffle</button>
-          <button class="mini-button" data-action="speak-current">Hear Arabic</button>
+          <button class="mini-button" data-action="speak-current">Hear it</button>
         </div>
       </div>
       <div class="flash-score-row">
-        <span class="score-pill is-good">✓ أعرف: ${state.flashKnown.length}</span>
-        <span class="score-pill is-bad">✗ لا أعرف: ${state.flashUnknown.length}</span>
+        <span class="score-pill is-good">✓ Got it: ${state.flashKnown.length}</span>
+        <span class="score-pill is-bad">✗ Review: ${state.flashUnknown.length}</span>
       </div>
       <div class="flashcard">
         <div class="flashcard-top">
@@ -2103,57 +2141,85 @@
           <div class="flashcard-tag">${flashCardPosition()} / ${state.flashRoundTotal}</div>
         </div>
         <div class="flashcard-main">
-          <div class="subcopy">${card.direction === "en-to-ar" ? "English to Arabic" : "Arabic to English"}</div>
+          <div class="subcopy flash-cue">${speakCue}</div>
           <div class="prompt ${promptIsArabic ? "arabic-text" : ""}">${prompt}</div>
-          <div class="answer ${!state.flashRevealed ? "is-hidden" : ""} ${!promptIsArabic ? "arabic-text" : ""}">${answer}</div>
-          <div class="subcopy">${lesson.focus}</div>
+          ${state.flashRevealed
+            ? `<div class="answer ${!promptIsArabic ? "arabic-text" : ""}">${answer}</div>`
+            : `<div class="answer-placeholder">— say it, then reveal —</div>`
+          }
         </div>
+        ${lesson.grammarNote ? `<div class="flash-grammar-hint">${lesson.grammarNote}</div>` : ""}
         <div class="flash-actions">
-          <button class="flash-action is-red" data-action="grade-flashcard" data-result="unknown">Don't know<small>retry later</small></button>
-          <button class="flash-action is-gold" data-action="toggle-flash-answer">${state.flashRevealed ? "Hide meaning" : "Check definition"}<small>peek first</small></button>
-          <button class="flash-action is-green" data-action="grade-flashcard" data-result="known">I know it<small>remove card</small></button>
+          <button class="flash-action is-red" data-action="grade-flashcard" data-result="unknown">Missed it<small>keep in deck</small></button>
+          <button class="flash-action is-gold" data-action="toggle-flash-answer">${state.flashRevealed ? "Hide" : "Reveal"}<small>${state.flashRevealed ? "hide answer" : "check yourself"}</small></button>
+          <button class="flash-action is-green" data-action="grade-flashcard" data-result="known">Got it<small>remove card</small></button>
         </div>
       </div>
     `;
   }
 
   function renderMatching() {
+    const pairCount = state.matchRound.length / 2;
+    const solvedPairs = state.matchSolved.length / 2;
+    const allSolved = solvedPairs === pairCount && pairCount > 0;
+
+    const leftCards = state.matchRound.filter((item) => item.side === "arabic");
+    const rightCards = state.matchRound.filter((item) => item.side === "english");
+
+    function cardHtml(item) {
+      const isSolved = state.matchSolved.includes(item.id);
+      const isSelected = state.matchSelection.includes(item.id);
+      return `
+        <button
+          class="match-card ${item.side === "arabic" ? "arabic-text" : ""} ${isSolved ? "is-matched" : ""} ${isSelected ? "is-selected" : ""}"
+          data-action="pick-match"
+          data-card-id="${item.id}"
+          ${isSolved ? "disabled" : ""}
+        >${item.label}</button>
+      `;
+    }
+
     return `
       <div class="toolbar">
         <div class="toolbar-row">
           <button class="mini-button" data-action="reset-matching">New round</button>
-          <span class="muted">${state.matchSolved.length / 2} pairs solved</span>
+          <span class="muted">${solvedPairs} / ${pairCount} matched</span>
         </div>
       </div>
-      <div class="match-grid">
-        ${state.matchRound
-          .map((item) => {
-            const isSolved = state.matchSolved.includes(item.id);
-            const isSelected = state.matchSelection.includes(item.id);
-            return `
-              <button class="match-card ${item.side === "arabic" ? "arabic-text" : ""} ${isSolved ? "is-matched" : ""} ${isSelected ? "is-selected" : ""}" data-action="pick-match" data-card-id="${item.id}">
-                ${item.label}
-              </button>
-            `;
-          })
-          .join("")}
+      ${allSolved ? `<div class="feedback is-good">All matched! Tap New round for more.</div>` : ""}
+      <div class="match-columns">
+        <div class="match-col">
+          <div class="match-col-label">Arabic</div>
+          ${leftCards.map(cardHtml).join("")}
+        </div>
+        <div class="match-col">
+          <div class="match-col-label">English</div>
+          ${rightCards.map(cardHtml).join("")}
+        </div>
       </div>
       ${state.matchFeedback ? `<div class="feedback ${state.matchFeedback.startsWith("Nice") ? "is-good" : "is-bad"}">${state.matchFeedback}</div>` : ""}
     `;
   }
 
   function renderTyping() {
+    const lesson = getPracticeLesson();
     const card = getTypingCard();
     const targetLanguage = state.typingDirection === "en-to-ar" ? "arabic" : "english";
     const prompt = targetLanguage === "arabic" ? card.english : card.arabic;
+    const answer = targetLanguage === "arabic" ? card.arabic : card.english;
+    const revealed = !!state.typingFeedback;
+
+    const dirCue = targetLanguage === "arabic"
+      ? "You see English — say the Arabic aloud to yourself, then reveal"
+      : "You see Arabic — say the meaning in English to yourself, then reveal";
 
     return `
       <div class="toolbar">
         <div class="toolbar-row">
           <div class="segmented">
             ${[
-              ["en-to-ar", "Type Arabic"],
-              ["ar-to-en", "Type English"]
+              ["en-to-ar", "English → say Arabic"],
+              ["ar-to-en", "Arabic → say English"]
             ]
               .map(
                 ([direction, label]) => `
@@ -2164,34 +2230,29 @@
               )
               .join("")}
           </div>
-          <button class="pill-button ${state.typingStrict ? "is-on" : ""}" data-action="toggle-typing-strict">Strict haraqat</button>
-          <button class="mini-button" data-action="next-typing">Next prompt</button>
+          <button class="mini-button" data-action="next-typing">Next</button>
+          <button class="mini-button" data-action="speak-current">Hear it</button>
         </div>
       </div>
       <div class="typing-card">
         <div class="typing-prompt">
-          <strong>${targetLanguage === "arabic" ? "Type the Arabic word" : "Type the English meaning"}</strong>
-          <div class="${targetLanguage === "english" ? "arabic-text" : ""}">${prompt}</div>
-          <div class="muted">${state.typingStrict ? "Strict mode expects the harakat too." : "Relaxed mode ignores most harakat differences."}</div>
+          <div class="subcopy flash-cue">${dirCue}</div>
+          <div class="${targetLanguage === "english" ? "arabic-text" : ""} recall-prompt">${prompt}</div>
         </div>
-        <input class="typing-input" data-input="typing-input" dir="${targetLanguage === "arabic" ? "rtl" : "ltr"}" lang="${targetLanguage === "arabic" ? "ar" : "en"}" value="${escapeHtml(state.typingInput)}" placeholder="${targetLanguage === "arabic" ? "اكتب هنا" : "Type here"}" />
-        ${
-          targetLanguage === "arabic"
-            ? `<div class="typing-pad">${["َ", "ِ", "ُ", "ْ", "ّ", "ً", "ٍ", "ٌ", "ة", "ى"]
-                .map((character) => `<button data-action="insert-char" data-char="${character}">${character}</button>`)
-                .join("")}</div>`
-            : ""
+        ${revealed
+          ? `<div class="recall-answer ${targetLanguage === "arabic" ? "arabic-text" : ""}">${answer}</div>`
+          : `<div class="answer-placeholder">— say it aloud, then reveal —</div>`
         }
-        <div class="typing-actions">
-          <button class="mini-button" data-action="submit-typing">Check answer</button>
-          <button class="mini-button" data-action="reveal-typing">Reveal answer</button>
-          <button class="mini-button" data-action="speak-current">Hear Arabic</button>
+        ${lesson.grammarNote ? `<div class="flash-grammar-hint">${lesson.grammarNote}</div>` : ""}
+        <div class="typing-actions recall-actions">
+          ${!revealed
+            ? `<button class="flash-action is-gold" data-action="reveal-typing">Reveal<small>check yourself</small></button>`
+            : `
+              <button class="flash-action is-red" data-action="next-typing">Missed it<small>keep going</small></button>
+              <button class="flash-action is-green" data-action="next-typing">Got it<small>keep going</small></button>
+            `
+          }
         </div>
-        ${
-          state.typingFeedback
-            ? `<div class="feedback ${state.typingFeedback.correct ? "is-good" : "is-bad"}">${state.typingFeedback.message}${state.typingFeedback.expected ? `<div class="feedback-inline"><strong>Expected:</strong> ${state.typingFeedback.expected}</div>` : ""}</div>`
-            : ""
-        }
       </div>
     `;
   }
@@ -2225,11 +2286,154 @@
     `;
   }
 
+  function renderGrammarChallenge() {
+    const lesson = getPracticeLesson();
+    const challenges = lesson.challenges || [];
+
+    if (!challenges.length) {
+      return `<div class="empty-card">No grammar challenges yet for this lesson.</div>`;
+    }
+
+    if (state.grammarComplete) {
+      const total = challenges.length;
+      const correct = Object.values(state.grammarAnswers).filter((a) => a.correct).length;
+      return `
+        <div class="lesson-complete-card">
+          <div class="lesson-complete-icon">📐</div>
+          <h3>Challenge complete</h3>
+          <p>${correct} out of ${total} correct</p>
+          <div class="lesson-complete-stats">
+            <div class="summary-card"><strong>${correct}</strong><span>Correct</span></div>
+            <div class="summary-card"><strong>${total - correct}</strong><span>Missed</span></div>
+          </div>
+          <div class="lesson-detail-actions">
+            <button class="lesson-nav-button is-primary" data-action="restart-grammar">Try again</button>
+          </div>
+        </div>
+      `;
+    }
+
+    const challenge = challenges[state.grammarIndex];
+    const answered = state.grammarAnswers[state.grammarIndex];
+
+    return `
+      <div class="grammar-challenge-card">
+        <div class="grammar-progress-row">
+          <span class="muted">${state.grammarIndex + 1} / ${challenges.length}</span>
+          <div class="grammar-pip-row">
+            ${challenges.map((_, i) => {
+              const a = state.grammarAnswers[i];
+              return `<span class="grammar-pip ${a ? (a.correct ? "is-correct" : "is-wrong") : (i === state.grammarIndex ? "is-current" : "")}"></span>`;
+            }).join("")}
+          </div>
+        </div>
+        ${lesson.grammarNote ? `<div class="flash-grammar-hint">${lesson.grammarNote}</div>` : ""}
+        <div class="grammar-question">${challenge.q}</div>
+        <div class="grammar-options">
+          ${challenge.options.map((opt) => {
+            let cls = "grammar-option";
+            if (answered) {
+              if (opt === challenge.answer) cls += " is-correct";
+              else if (opt === answered.picked) cls += " is-wrong";
+            }
+            return `
+              <button class="${cls}" data-action="pick-grammar-answer" data-option="${escapeHtml(opt)}" ${answered ? "disabled" : ""}>
+                ${opt}
+              </button>
+            `;
+          }).join("")}
+        </div>
+        ${answered ? `
+          <div class="grammar-explanation ${answered.correct ? "is-good" : "is-bad"}">
+            ${answered.correct ? "Correct." : `The answer is: <strong>${challenge.answer}</strong>.`}
+            ${challenge.exp ? `<p>${challenge.exp}</p>` : ""}
+          </div>
+          <div class="grammar-next-row">
+            <button class="lesson-nav-button is-primary" data-action="next-grammar">
+              ${state.grammarIndex + 1 < challenges.length ? "Next question →" : "See results"}
+            </button>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }
+
+  function renderSentenceBuilder() {
+    const lesson = getPracticeLesson();
+    const phrases = lesson.phrases || [];
+
+    if (!phrases.length) {
+      return `<div class="empty-card">No phrases available for this lesson.</div>`;
+    }
+
+    if (state.builderComplete) {
+      return `
+        <div class="lesson-complete-card">
+          <div class="lesson-complete-icon">🧩</div>
+          <h3>All sentences built!</h3>
+          <p>You completed all ${phrases.length} phrase${phrases.length === 1 ? "" : "s"} for ${lesson.label}.</p>
+          <div class="lesson-detail-actions">
+            <button class="lesson-nav-button is-primary" data-action="restart-builder">Go again</button>
+          </div>
+        </div>
+      `;
+    }
+
+    const phrase = phrases[state.builderPhraseIndex];
+    const answered = !!state.builderFeedback;
+
+    return `
+      <div class="builder-card">
+        <div class="grammar-progress-row">
+          <span class="muted">Phrase ${state.builderPhraseIndex + 1} / ${phrases.length}</span>
+        </div>
+        <div class="builder-target">
+          <div class="builder-label">Build this in Arabic:</div>
+          <div class="builder-english">${phrase.english}</div>
+        </div>
+        <div class="builder-zone ${state.builderFeedback ? (state.builderFeedback.correct ? "is-correct" : "is-wrong") : ""}">
+          ${state.builderPicked.length
+            ? state.builderPicked.map((tok) => `
+                <button class="builder-tile is-picked arabic-text" data-action="unpick-builder-token" data-token-id="${tok.id}" ${answered ? "disabled" : ""}>
+                  ${tok.text}
+                </button>
+              `).join("")
+            : `<span class="builder-placeholder">Tap words below to build the sentence</span>`
+          }
+        </div>
+        ${state.builderFeedback && !state.builderFeedback.correct ? `
+          <div class="builder-correct-answer arabic-text">${phrase.arabic}</div>
+        ` : ""}
+        <div class="builder-tiles">
+          ${state.builderAvailable.map((tok) => `
+            <button class="builder-tile arabic-text" data-action="pick-builder-token" data-token-id="${tok.id}" ${answered ? "disabled" : ""}>
+              ${tok.text}
+            </button>
+          `).join("")}
+        </div>
+        ${!answered ? `
+          <div class="builder-actions">
+            <button class="mini-button" data-action="clear-builder">Clear</button>
+            <button class="lesson-nav-button is-primary" data-action="check-builder" ${state.builderPicked.length === 0 ? "disabled" : ""}>Check</button>
+          </div>
+        ` : `
+          <div class="builder-actions">
+            <button class="lesson-nav-button is-primary" data-action="next-builder-phrase">
+              ${state.builderPhraseIndex + 1 < phrases.length ? "Next phrase →" : "Finish"}
+            </button>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
   function renderPracticeBody() {
     if (!state.practiceMode) return renderPracticeModeChooser();
     if (state.practiceMode === "quiz") return renderQuizPractice();
     if (state.practiceMode === "flashcards") return renderFlashcards();
     if (state.practiceMode === "matching") return renderMatching();
+    if (state.practiceMode === "grammar") return renderGrammarChallenge();
+    if (state.practiceMode === "builder") return renderSentenceBuilder();
     if (state.practiceMode === "typing") return renderTyping();
     return renderPronunciation();
   }
@@ -2608,6 +2812,59 @@
     if (action === "restart-flash-round") resetFlashcards();
 
     if (action === "reset-matching") resetMatchRound();
+
+    if (action === "pick-grammar-answer") {
+      const lesson = getPracticeLesson();
+      const challenge = lesson.challenges[state.grammarIndex];
+      const picked = target.dataset.option;
+      const correct = picked === challenge.answer;
+      state.grammarAnswers[state.grammarIndex] = { picked, correct };
+      trackAnswer(lesson.id, { id: `grammar-${state.grammarIndex}`, english: challenge.q, arabic: challenge.answer }, correct ? "known" : "unknown");
+    }
+    if (action === "next-grammar") {
+      const lesson = getPracticeLesson();
+      if (state.grammarIndex + 1 < lesson.challenges.length) {
+        state.grammarIndex++;
+      } else {
+        state.grammarComplete = true;
+      }
+    }
+    if (action === "restart-grammar") resetGrammarChallenge();
+
+    if (action === "pick-builder-token") {
+      const id = target.dataset.tokenId;
+      const tok = state.builderAvailable.find((t) => t.id === id);
+      if (tok) {
+        state.builderAvailable = state.builderAvailable.filter((t) => t.id !== id);
+        state.builderPicked = state.builderPicked.concat(tok);
+      }
+    }
+    if (action === "unpick-builder-token") {
+      const id = target.dataset.tokenId;
+      const tok = state.builderPicked.find((t) => t.id === id);
+      if (tok) {
+        state.builderPicked = state.builderPicked.filter((t) => t.id !== id);
+        state.builderAvailable = state.builderAvailable.concat(tok);
+      }
+    }
+    if (action === "clear-builder") {
+      state.builderAvailable = state.builderAvailable.concat(state.builderPicked);
+      state.builderPicked = [];
+    }
+    if (action === "check-builder") {
+      const lesson = getPracticeLesson();
+      const phrase = lesson.phrases[state.builderPhraseIndex];
+      const attempt = state.builderPicked.map((t) => t.text).join(" ");
+      const correct = attempt.trim() === phrase.arabic.trim();
+      state.builderFeedback = { correct };
+      trackAnswer(lesson.id, { id: `builder-${state.builderPhraseIndex}`, english: phrase.english, arabic: phrase.arabic }, correct ? "known" : "unknown");
+    }
+    if (action === "next-builder-phrase") {
+      const lesson = getPracticeLesson();
+      state.builderPhraseIndex++;
+      loadBuilderPhrase(lesson);
+    }
+    if (action === "restart-builder") resetSentenceBuilder();
     if (action === "pick-match") {
       const cardIdValue = target.dataset.cardId;
       if (!state.matchSolved.includes(cardIdValue)) {
@@ -2647,7 +2904,7 @@
     if (action === "reveal-typing") {
       const card = getTypingCard();
       const expected = state.typingDirection === "en-to-ar" ? card.arabic : card.english;
-      state.typingFeedback = { correct: false, expected, message: "Answer revealed. Type it once before moving on." };
+      state.typingFeedback = { correct: false, expected, message: "Answer revealed. Say it aloud once, then mark yourself." };
     }
     if (action === "next-typing") nextTypingCard();
 

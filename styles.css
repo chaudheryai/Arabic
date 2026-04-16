@@ -555,27 +555,55 @@ button {
   margin-bottom: 8px;
 }
 
-.match-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.match-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.match-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.match-col-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(17, 39, 45, 0.45);
+  padding: 0 4px 2px;
 }
 
 .match-card {
-  min-height: 64px;
-  padding: 12px 10px;
-  border-radius: 14px;
-  text-align: left;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  text-align: center;
   color: var(--ink);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 243, 234, 0.96));
-  font-size: 0.84rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.match-card.arabic-text {
+  font-size: 1.1rem;
+  line-height: 1.4;
 }
 
 .match-card.is-selected {
   outline: 3px solid rgba(140, 200, 209, 0.8);
+  background: rgba(200, 235, 240, 0.6);
 }
 
 .match-card.is-matched {
   color: #f7f3ea;
   background: linear-gradient(180deg, rgba(63, 161, 109, 0.98), rgba(43, 122, 85, 0.96));
+  cursor: default;
 }
 
 .typing-prompt {
@@ -807,10 +835,6 @@ button {
 
   .practice-body:has(.flashcard) .flash-action small {
     font-size: 0.64rem;
-  }
-
-  .match-grid {
-    grid-template-columns: 1fr;
   }
 
   .typing-pad {
@@ -2559,5 +2583,288 @@ body {
 
   .nav-label {
     font-size: 0.66rem;
+  }
+}
+
+/* ── Grammar Challenge ──────────────────────────────────────────── */
+
+.grammar-challenge-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.grammar-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.grammar-pip-row {
+  display: flex;
+  gap: 5px;
+}
+
+.grammar-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(17, 39, 45, 0.15);
+  flex-shrink: 0;
+}
+
+.grammar-pip.is-correct { background: #2c8f5c; }
+.grammar-pip.is-wrong   { background: #c33a30; }
+.grammar-pip.is-current { background: rgba(17, 39, 45, 0.45); }
+
+.grammar-question {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.grammar-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grammar-option {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid rgba(17, 39, 45, 0.12);
+  color: var(--ink);
+  transition: background 120ms, border-color 120ms;
+}
+
+.grammar-option:not([disabled]):hover {
+  background: rgba(200, 235, 240, 0.5);
+  border-color: rgba(140, 200, 209, 0.7);
+}
+
+.grammar-option.is-correct {
+  background: rgba(44, 143, 92, 0.12);
+  border-color: #2c8f5c;
+  color: #1a5c38;
+  font-weight: 600;
+}
+
+.grammar-option.is-wrong {
+  background: rgba(195, 58, 48, 0.1);
+  border-color: #c33a30;
+  color: #8b2a22;
+}
+
+.grammar-explanation {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.grammar-explanation.is-good {
+  background: rgba(44, 143, 92, 0.1);
+  border-left: 3px solid #2c8f5c;
+  color: #1a5c38;
+}
+
+.grammar-explanation.is-bad {
+  background: rgba(195, 58, 48, 0.08);
+  border-left: 3px solid #c33a30;
+  color: #6b2020;
+}
+
+.grammar-explanation p {
+  margin: 6px 0 0;
+  color: inherit;
+}
+
+.grammar-next-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Sentence Builder ────────────────────────────────────────────── */
+
+.builder-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.builder-target {
+  background: rgba(17, 39, 45, 0.04);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.builder-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(17, 39, 45, 0.45);
+  margin-bottom: 4px;
+}
+
+.builder-english {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.builder-zone {
+  min-height: 60px;
+  border: 2px dashed rgba(17, 39, 45, 0.18);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  transition: border-color 200ms, background 200ms;
+}
+
+.builder-zone.is-correct {
+  border-color: #2c8f5c;
+  background: rgba(44, 143, 92, 0.07);
+}
+
+.builder-zone.is-wrong {
+  border-color: #c33a30;
+  background: rgba(195, 58, 48, 0.06);
+}
+
+.builder-placeholder {
+  font-size: 0.82rem;
+  color: rgba(17, 39, 45, 0.35);
+  font-style: italic;
+  width: 100%;
+  text-align: center;
+}
+
+.builder-correct-answer {
+  font-size: 1.1rem;
+  color: #2c8f5c;
+  font-weight: 600;
+  text-align: center;
+  padding: 4px 0;
+  direction: rtl;
+}
+
+.builder-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0 2px;
+}
+
+.builder-tile {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(247,243,234,0.92));
+  border: 1.5px solid rgba(17, 39, 45, 0.14);
+  color: var(--ink);
+  transition: transform 100ms, background 120ms;
+}
+
+.builder-tile:not([disabled]):active {
+  transform: scale(0.95);
+}
+
+.builder-tile.is-picked {
+  background: linear-gradient(180deg, rgba(200,235,240,0.9), rgba(160,215,225,0.85));
+  border-color: rgba(80, 170, 190, 0.6);
+}
+
+.builder-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+/* ── Speak & recall practice additions ─────────────────────────── */
+
+.flash-cue {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: rgba(17, 39, 45, 0.58);
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+
+.answer-placeholder {
+  font-size: 0.9rem;
+  color: rgba(17, 39, 45, 0.35);
+  font-style: italic;
+  letter-spacing: 0.01em;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.flash-grammar-hint {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: rgba(17, 39, 45, 0.55);
+  background: rgba(17, 39, 45, 0.045);
+  border-left: 3px solid rgba(17, 39, 45, 0.18);
+  border-radius: 0 8px 8px 0;
+  padding: 8px 12px;
+  margin: 6px 0;
+}
+
+.recall-prompt {
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 6px 0;
+}
+
+.recall-answer {
+  font-size: clamp(1.3rem, 4.5vw, 1.85rem);
+  font-weight: 600;
+  color: #1d6b52;
+  line-height: 1.25;
+  padding: 8px 0;
+  border-top: 1px solid rgba(17, 39, 45, 0.1);
+  margin-top: 4px;
+}
+
+.recall-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.recall-actions .flash-action {
+  flex: 1;
+  max-width: 200px;
+}
+
+@media (max-width: 480px) {
+  .flash-grammar-hint {
+    font-size: 0.7rem;
+    padding: 6px 10px;
+  }
+
+  .recall-prompt {
+    font-size: clamp(1.2rem, 5vw, 1.5rem);
+  }
+
+  .recall-answer {
+    font-size: clamp(1.1rem, 5vw, 1.4rem);
   }
 }
